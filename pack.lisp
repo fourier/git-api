@@ -389,7 +389,7 @@ little-endian format, therefore the most significant byte comes last"
                ;; index will contain conses of pack offsets/hashes
                ;; sorted by offset. It is needed to determine the
                ;; end of the compressed entry in the pack file
-               (index (make-array size :adjustable nil)))
+               (index (make-array size :adjustable nil :element-type '(cons ))))
           (declare (ignore pos))
           ;; now move to the position where the objects started
           ;; we will read them one by one to fill the index table
@@ -407,7 +407,7 @@ little-endian format, therefore the most significant byte comes last"
                 (setf (aref index i) (cons offset hash)
                       (gethash offset offsets-table) hash)))
           ;; finally return the sorted array of conses (offset . hash)
-          (sort index #'< :key (lambda (x) (the integer (car x))))))))))
+          (sort index (lambda (x y) (declare (integer x y)) (< x y)) :key (lambda (x) (the integer (car x))))))))))
 
           
 (defun read-fanout-table (stream)

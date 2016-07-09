@@ -13,7 +13,16 @@
 (defparameter +git-objects-dir-regexp+ (ppcre:create-scanner "(?i)/([0-9|a-f]){2}/$")
   "Regular expression scanner used to determine which of directories
 in .git/objects are containing objects (not a packfiles or info)")
-  
+
+;;----------------------------------------------------------------------------
+;; Conditions
+;;----------------------------------------------------------------------------
+(define-condition not-existing-repository-error (error)
+  ((text :initarg :text :reader text)))
+
+(define-condition corrupted-repository-error (error)
+  ((text :initarg :text :reader text)))
+
 
 ;;----------------------------------------------------------------------------
 ;; Repository class
@@ -34,6 +43,8 @@ in .git/objects are containing objects (not a packfiles or info)")
             :documentation "A cache of commit objects to avoid double-reading"))
   (:documentation "Class representing git repository"))
 
+(defmacro repo-file (str)
+  `(concatenate 'string (slot-value self 'path) ".git/" ,str))
 
 @export
 (defun make-git-repo (path)
@@ -46,8 +57,20 @@ in .git/objects are containing objects (not a packfiles or info)")
     ;; append trailing "/"
     (unless (ends-with "/" path)
       (setf path (concatenate 'string path "/")))
+    ;; sanity checks
+    (unless (fad:file-exists-p path)
+      (error 'not-existing-repository-error
+             :text (format nil "Path ~a doesn't exist" path)))
+    (unless (fad:file-exists-p (concatenate 'string path ".git"))
+      (error 'not-existing-repository-error
+             :text (format nil "No .git found in ~a" path)))
+    (unless (every #'fad:file-exists-p
+                   (mapcar (curry #'concatenate 'string path)
+                           '(".git/HEAD" ".git/objects" ".git/config" ".git/refs")))
+      (error 'not-existing-repository-error
+             :text (format nil "Repository in ~a has a corrupted structure" path)))
     ;; collect all pack files
-    (let ((files (directory (concatenate 'string path ".git/objects/pack/*.pack"))))
+    (let ((files (directory (repo-file "objects/pack/*.pack"))))
       (mapcar (lambda (pack)
                 (push (parse-pack-file (namestring pack)) pack-files))
               files))
@@ -55,7 +78,7 @@ in .git/objects are containing objects (not a packfiles or info)")
     (dolist (pack pack-files)
       (pack-open-stream pack))
     ;; read all refs from the packed-refs
-    (let ((packed-refs-filename (concatenate 'string path ".git/packed-refs")))
+    (let ((packed-refs-filename (repo-file "packed-refs")))
       (when (fad:file-exists-p packed-refs-filename)
         (with-open-file (stream packed-refs-filename
                                 :direction :input)
@@ -76,13 +99,14 @@ in .git/objects are containing objects (not a packfiles or info)")
     ;; find all not-packed object files in repo
     (update-repo-objects self)))
 
+
 (defmethod update-repo-objects ((self git-repo))
   (with-slots (object-files path) self
     (let ((object-dirs 
            (remove-if-not
             (curry #'ppcre:scan +git-objects-dir-regexp+)
             (mapcar #'namestring
-                    (fad:list-directory (concatenate 'string path ".git/objects/"))))))
+                    (fad:list-directory (repo-file "objects/"))))))
       (loop for dir in object-dirs
             do
             (loop for fil in (mapcar #'namestring (fad:list-directory dir))
@@ -140,15 +164,14 @@ in .git/objects are containing objects (not a packfiles or info)")
 
 @export
 (defmethod get-head-hash ((self git-repo))
-  (with-slots (path) self
-    (let* ((head-file (concatenate 'string path ".git/HEAD"))
-           (head-contents (read-one-line head-file)))
-      ;; check if the HEAD points to the detached commit
-      (if (not (starts-with-subseq "ref: " head-contents))
-          head-contents
-          ;; otherwise search if this file exists
-          (let* ((head-ref (cadr (split-sequence:split-sequence #\space head-contents))))
-            (get-hash-by-ref self head-ref))))))
+  (let* ((head-file (repo-file "HEAD"))
+         (head-contents (read-one-line head-file)))
+    ;; check if the HEAD points to the detached commit
+    (if (not (starts-with-subseq "ref: " head-contents))
+        head-contents
+        ;; otherwise search if this file exists
+        (let* ((head-ref (cadr (split-sequence:split-sequence #\space head-contents))))
+          (get-hash-by-ref self head-ref)))))
 
 
 (defmethod get-hash-by-ref ((self git-repo) ref)
@@ -156,17 +179,14 @@ in .git/objects are containing objects (not a packfiles or info)")
 Examples of ref strings:
 ref/heads/master
 refs/tags/v1.0"
-  (with-slots (packed-refs path) self
-    (let ((ref-file (concatenate 'string path ".git/" ref)))
+  (with-slots (packed-refs) self
+    (let ((ref-file (repo-file ref)))
       ;; check if the ref is a normal file
       (if (fad:file-exists-p ref-file)
           (read-one-line ref-file)
           ;; otherwise find in packed refs
           (gethash ref packed-refs)))))
     
-(defparameter *count-cached* 0)
-(defparameter *count-new* 0)
-
 @export
 (defmethod get-head-commit ((self git-repo))
   (get-commit self (get-head-hash self)))
@@ -181,21 +201,18 @@ refs/tags/v1.0"
 (defmethod get-commit ((self git-repo) hash)
   (with-slots (commits) self
     (if-let (commit (gethash hash commits))
-        (progn (incf *count-cached*)
-          commit)
-      (progn
-        (incf *count-new*)
-        (print *count-new*)
-      (setf (gethash hash commits) (get-object-by-hash self hash))))))
+        commit
+      (setf (gethash hash commits) (get-object-by-hash self hash)))))
 
 
 (defmethod get-commit-tree ((self git-repo) (object git-api.object:commit))
-  (let ((tree nil)
+  (let ((tree (make-hash-table :test #'equal))
         (children (list object)))
     (loop while children
           do
           (progn
             (let* ((current (pop children))
                    (kids (get-commit-parents self current)))
-              (mapcar (lambda (x) (push (object-hash x) tree) (push x children)) kids))))
+              (mapcar (lambda (x) (setf (gethash (object-hash x) tree) x) (push x children))
+                      (remove-if (lambda(x) (gethash (object-hash x) tree)) kids)))))
     tree))
