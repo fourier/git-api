@@ -22,15 +22,15 @@ in .git/objects are containing objects (not a packfiles or info)")
 (defclass git-repo ()
   ((path :initarg :path :reader repo-path
          :documentation "Path to the repository")
-   (object-files :reader object-files :initform (make-hash-table :test #'string=)
+   (object-files :reader object-files :initform (make-hash-table :test #'equal)
                  :documentation "A hash table with the SHA1 hex as a key and filename as a value for all unpacked objects in .git/objects directory")
    (pack-files :reader pack-files :initform nil
                :documentation "List of pack-file objects")
-   (packed-refs :reader packed-refs :initform (make-hash-table :test #'string=)
+   (packed-refs :reader packed-refs :initform (make-hash-table :test #'equal)
                 :documentation "Map between ref string and SHA1 text code in packed-refs file")
-   (annotated-tags :reader annotated-tags :initform (make-hash-table :test #'string=)
+   (annotated-tags :reader annotated-tags :initform (make-hash-table :test #'equal)
                    :documentation "Map between ref string of annotated tag and the SHA1 text code of the commit this annotated tag points to")
-   (commits :reader commits :initform (make-hash-table :test #'string=)
+   (commits :reader commits :initform (make-hash-table :test #'equal)
             :documentation "A cache of commit objects to avoid double-reading"))
   (:documentation "Class representing git repository"))
 
@@ -97,6 +97,7 @@ in .git/objects are containing objects (not a packfiles or info)")
     
 
 (defmethod git-repo-close ((self git-repo))
+  ;; TODO: add this to finalizer
   (with-slots (pack-files) self
     ;; open file streams in pack files
     (dolist (pack pack-files)
@@ -163,7 +164,8 @@ refs/tags/v1.0"
           ;; otherwise find in packed refs
           (gethash ref packed-refs)))))
     
-
+(defparameter *count-cached* 0)
+(defparameter *count-new* 0)
 
 @export
 (defmethod get-head-commit ((self git-repo))
@@ -179,8 +181,12 @@ refs/tags/v1.0"
 (defmethod get-commit ((self git-repo) hash)
   (with-slots (commits) self
     (if-let (commit (gethash hash commits))
-        commit
-      (setf (gethash hash commits) (get-object-by-hash self hash)))))
+        (progn (incf *count-cached*)
+          commit)
+      (progn
+        (incf *count-new*)
+        (print *count-new*)
+      (setf (gethash hash commits) (get-object-by-hash self hash))))))
 
 
 (defmethod get-commit-tree ((self git-repo) (object git-api.object:commit))

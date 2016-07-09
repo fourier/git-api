@@ -207,7 +207,6 @@ the value is a instance of PACK-ENTRY structure."
 (offset . compressed-size),  offset in the pack file and compressed
 size(including header).
 INDEX is a sorted list of pairs (sha1 . offset)"
-  (declare (optimize (float 0)))
   (let ((table (make-hash-table :test #'equalp :size (length index)))
         (file-length (file-length stream)))
     ;; fill the table.
