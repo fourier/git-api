@@ -397,7 +397,7 @@ little-endian format, therefore the most significant byte comes last"
           (file-position stream objects-pos)
           ;; the offsets table is a hash table with the offset as a key
           ;; and the hash as a value
-          (setf offsets-table (make-hash-table :test #'eq :size size))
+          (setf offsets-table (make-hash-table :test #'= :size size))
           (loop for i from 0 below size do
                 (let ((offset (aref offsets i))
                       (hash (make-array +sha1-size+
@@ -432,6 +432,7 @@ less or equal to 256, as the byte <= 256"
     
 (defun read-offsets (stream size)
   "Read offset table[s] and return the array of offsets in PACK file"
+  (declare (optimize (speed 3) (safety 0) (debug 0)))
   (let* ((offsets (make-array size :element-type 'fixnum :adjustable nil))
          (big-offsets nil)
          (bytes-size (* size 4))
