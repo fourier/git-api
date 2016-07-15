@@ -61,6 +61,17 @@
                                               :adjustable nil)
   "Temporary 20 bytes array used to convert sha1 hash from string to binary format")
 
+;;----------------------------------------------------------------------------
+;; Conditions
+;;----------------------------------------------------------------------------
+(define-condition corrupted-pack-file-error (error)
+  ((text :initarg :text :reader text)))
+
+(define-condition corrupted-index-file-error (error)
+  ((text :initarg :text :reader text)))
+
+
+
 @export-class
 (defclass pack-entry  ()
   ((offset :initarg :offset :initform nil
@@ -195,7 +206,9 @@ the value is a instance of PACK-ENTRY structure."
                      (= +pack-version+ (read-ub32/be stream)))
             (let ((objects-count (read-ub32/be stream)))
               ;; sanity check
-              (assert (= objects-count (length index)))
+              (unless (= objects-count (length index))
+                (error 'corrupted-pack-file-error :text
+                       (format nil "Corrupted pack file ~a. Number of objects ~d != index length ~d" filename objects-count (length index))))
               ;; finally create the hash table with the mapping between
               ;; sha1 binary code and entry 
               (setf index-table
@@ -207,6 +220,8 @@ the value is a instance of PACK-ENTRY structure."
 (offset . compressed-size),  offset in the pack file and compressed
 size(including header).
 INDEX is a sorted list of pairs (sha1 . offset)"
+  (declare (optimize (speed 3) (safety 0) (debug 0)))
+  (declare (type integer offset compressed-size i file-length))
   (let ((table (make-hash-table :test #'equalp :size (length index)))
         (file-length (file-length stream)))
     ;; fill the table.
@@ -276,9 +291,9 @@ Second byte: 236
 Remove msb -> 108, shift << 4 = 1728.
 1728 + 5(extracted from 1st byte) = 1733
 Third byte, no msb -> 3, shift 11 (4 + 7) = 6144
-And finally the length is 6144 + 1733 = 7833
-"
-  (declare (optimize (float 0)))
+And finally the length is 6144 + 1733 = 7833"
+  (declare (optimize (speed 3) (safety 0) (debug 0)))
+  (declare (type fixnum head shift type len))
   (let* ((base-hash (make-array +sha1-size+
                                 :element-type '(unsigned-byte 8)
                                 :fill-pointer 0 :adjustable nil))
@@ -292,8 +307,8 @@ And finally the length is 6144 + 1733 = 7833
     (loop while (>= head 128)
           do
           (progn 
-            (setf head (read-byte stream))
-            (incf len (ash (logand 127 head) shift))
+            (setf head (the fixnum (read-byte stream)))
+            (incf len (the fixnum (ash (the fixnum (logand 127 head)) shift)))
             (incf shift 7)))
     ;; check if type is OBJ-REF-DELTA or OBJ-OFS-DELTA
     (switch (type)
@@ -302,7 +317,7 @@ And finally the length is 6144 + 1733 = 7833
        (read-sequence base-hash stream))
       (OBJ-OFS-DELTA
        ;; read the variable-length integer
-       (setf base-offset (read-network-vli stream))))
+       (setf base-offset (the fixnum (read-network-vli stream)))))
     (values type len base-hash base-offset)))
 
 
@@ -362,18 +377,21 @@ little-endian format, therefore the most significant byte comes last"
 ;;----------------------------------------------------------------------------
 (defmethod parse-index-file ((self pack-file) filename)
   "Parse the pack index file. Returns an array of pairs: SHA1 hex string and offset"
+  (declare (optimize (speed 3) (safety 0) (debug 0)))
   (with-slots (offsets-table) self
     (with-open-file (stream filename :direction :input
                             :element-type '(unsigned-byte 8))
-    (let ((header (make-array 4
-                              :element-type '(unsigned-byte 8)
-                              :fill-pointer t)))
-      ;; 1. read the header 4 bytes
-      (read-sequence header stream :end 4)
-      ;; check header word
-      (when (and (equalp header +index-file-header-word+)
-                 ;; read the version 4 bytes and check version = 2
-                 (= +pack-version+ (read-ub32/be stream)))
+      (let ((header (make-array 4
+                                :element-type '(unsigned-byte 8)
+                                :fill-pointer t)))
+        ;; 1. read the header 4 bytes
+        (read-sequence header stream :end 4)
+        ;; check header word
+        (unless (and (equalp header +index-file-header-word+)
+                     ;; read the version 4 bytes and check version = 2
+                     (= +pack-version+ (read-ub32/be stream)))
+          (error 'corrupted-index-file-error :text
+                 (format nil "Corrupted index file ~a. Header is incorrect" filename)))
         ;; 2. read the fanout table
         (let* ((fanout (read-fanout-table stream))
                (size (aref fanout 255))
@@ -397,17 +415,19 @@ little-endian format, therefore the most significant byte comes last"
           (file-position stream objects-pos)
           ;; the offsets table is a hash table with the offset as a key
           ;; and the hash as a value
-          (setf offsets-table (make-hash-table :test #'= :size size))
-          (loop for i from 0 below size do
+          (setf offsets-table (make-hash-table :test #'eq :size size))
+          (loop for i fixnum from 0 below size do
                 (let ((offset (aref offsets i))
                       (hash (make-array +sha1-size+
                                         :element-type '(unsigned-byte 8)
                                         :adjustable nil)))
+                  (declare (type (simple-array (unsigned-byte 8) (#.+sha1-size+)) hash)
+                           (type integer offset))
                   (read-sequence hash stream)                  
-                (setf (aref index i) (cons offset hash)
-                      (gethash offset offsets-table) hash)))
+                  (setf (aref index i) (cons offset hash)
+                        (gethash offset offsets-table) hash)))
           ;; finally return the sorted array of conses (offset . hash)
-          (sort index (lambda (x y) (declare (integer x y)) (< x y)) :key (lambda (x) (the integer (car x))))))))))
+          (sort index (lambda (x y) (declare (integer x y)) (< x y)) :key (lambda (x) (the integer (car x)))))))))
 
           
 (defun read-fanout-table (stream)
@@ -423,7 +443,7 @@ One can deduct number of entries in pack file - it should be in the last
 element of the table (since any byte sequence starts with the number
 less or equal to 256, as the byte <= 256"
   (let ((fanout (make-array 256 :element-type 'integer :fill-pointer t)))
-    (loop for i from 0 to 255
+    (loop for i fixnum from 0 to 255
           do
           (setf (aref fanout i) (read-ub32/be stream)))
     fanout))
@@ -439,10 +459,10 @@ less or equal to 256, as the byte <= 256"
          (table (make-array bytes-size :element-type '(unsigned-byte 8)  :adjustable nil)))
     ;; we will read all the table into bytes array
     (read-sequence table stream)
-    (loop for i from 0 below bytes-size by 4 do
+    (loop for i fixnum from 0 below bytes-size by 4 do
           ;; processing separately depending if the MSB is set on the first
           ;; byte of encoded length
-          (if (>= (aref table i) 128)
+          (if (>= (the fixnum (aref table i)) 128)
               ;; if set we clear the msb 
               (progn
                 (setf (aref table i) (logand 127 (aref table i)))
@@ -526,6 +546,7 @@ from the pack file as a vector of bytes.
 HASH is as SHA1 code as a byte array (20 values)"
   (flet ((stream-get-object-by-array-hash (stream entry)
            (when (typep entry 'cons) ; not an entry yet, create one
+             ;; create new entry will add it automatically to the index-table
              (setf entry (create-new-entry self hash entry stream)))
            (values (get-object-chunk entry self stream) (pack-entry-type entry))))
     (with-slots (pack-filename index-table pack-stream) self
@@ -542,23 +563,50 @@ HASH is as SHA1 code as a byte array (20 values)"
               (stream-get-object-by-array-hash stream entry)))))))
 
 
+(defparameter *temporary-read-buffer* (make-array 8192
+                                                  :element-type '(unsigned-byte 8)
+                                                  :fill-pointer t))
+
+
+(defparameter *temporary-output-buffer* (make-array 8192
+                                                    :element-type '(unsigned-byte 8)
+                                                    :fill-pointer 0))
+
+(defparameter *use-temporary-output-buffer* t)
+
 (defun get-object-data (entry stream)
-  "Return the uncompressed data for pack-entry from the opened file stream"
+  "Return the uncompressed data for pack-entry from the opened file stream.
+BUFFER is a optional buffer to read compressed data"
   ;; move to position data-offset
   (file-position stream (pack-entry-data-offset entry))
-  ;; uncompress chunk 
-  (zlib:uncompress
-   ;; of size compressed-size
-   (let ((object (make-array (pack-entry-compressed-size entry)
-                             :element-type '(unsigned-byte 8)
-                             :fill-pointer t)))
-     (read-sequence object stream)
-     object) :uncompressed-size (pack-entry-uncompressed-size entry)))
+  (let ((read-buffer
+         (if (> (pack-entry-compressed-size entry) 8192)
+             (make-array (pack-entry-compressed-size entry)
+                         :element-type '(unsigned-byte 8)
+                         :fill-pointer t)
+             *temporary-read-buffer*))
+        (output-buffer
+         (if (and *use-temporary-output-buffer*
+                  (<= (pack-entry-uncompressed-size entry) 8192))
+             (progn
+               (setf (fill-pointer *temporary-output-buffer*) 0)
+               *temporary-output-buffer*)
+             (make-array (pack-entry-uncompressed-size entry)
+                         :element-type '(unsigned-byte 8)
+                         :fill-pointer 0))))
+    ;; sanity check
+    (assert (>= (array-total-size read-buffer) (pack-entry-compressed-size entry)))
+    ;; read the data
+    (read-sequence read-buffer stream :end (pack-entry-compressed-size entry))
+    ;; uncompress chunk
+    (zlib:uncompress read-buffer :output-buffer output-buffer :start 0 :end (pack-entry-compressed-size entry))))
+
 
 (defmethod get-object-chunk ((entry pack-entry) (pack pack-file) stream)
   "Return the uncompressed data for pack-entry from the opened file stream"
   (declare (ignore pack))
   (get-object-data entry stream))
+
 
 (defmethod get-object-chunk ((entry pack-entry-delta) (pack pack-file) stream)
   "Return the uncompressed data for pack-entry from the opened file stream"
@@ -566,28 +614,14 @@ HASH is as SHA1 code as a byte array (20 values)"
   (file-position stream (pack-entry-data-offset entry))
   ;; current object is delta. Let's get its parent's chunk
   ;; (recursively if necessary)
+  (let ((*use-temporary-output-buffer* nil))
   (multiple-value-bind (parent type)
       (pack-get-object-by-array-hash pack (pack-entry-base-hash entry))
     ;; set the type from parent
     (setf (pack-entry-type entry) type)
     ;; merge
-    (apply-delta parent (get-object-data entry stream))))
-
-
-(defun apply-deltas (delta-queue)
-  "Reconstuct the object by given list of deltas and the base
-object at the head of the list.
-Deltas should be applied consequently, i.e.
-head - is the very base object
-second element is the delta to this object,
-third is the delta to the object constructed by applying second delta
-to the head of the list and so on."
-  (let ((result (car delta-queue)))
-    (dolist (delta (cdr delta-queue))
-      (setf result (apply-delta result delta)))
-    result))
+    (apply-delta parent (get-object-data entry stream)))))
     
-
 
 (defun apply-delta (base delta)
   (let* ((stream (flexi-streams:make-in-memory-input-stream delta))
@@ -596,10 +630,15 @@ to the head of the list and so on."
          (pos (file-position stream))
          (end (length delta))
          (result (make-array target-length
-                             :element-type '(unsigned-byte 8)
-                             :fill-pointer t)))
+                             :element-type '(unsigned-byte 8))))
     ;; sanity check
-    (assert (= (length base) source-length))
+    (unless (= (length base) source-length)
+      (error 'corrupted-pack-file-error
+             :text
+             (format nil
+                     "Delta error: base length ~a does not match decoded length ~a"
+                     (length base)
+                     source-length)))
     ;; implementation of the patching
     ;; switch the diff type
     (let ((dest-pos 0)) ;; position in result buffer

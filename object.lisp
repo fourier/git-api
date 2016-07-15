@@ -50,9 +50,9 @@
 
 (defmethod print-object ((self tree) stream)
   (with-slots (entries) self
-    (mapcar (lambda (e)
-              (format stream "~a~%" e))
-            entries)))
+    (mapc (lambda (e)
+            (format stream "~a~%" e))
+          entries)))
 
 @export-class
 (defclass tag (git-object)
@@ -107,15 +107,18 @@
 and returns a PAIR:
   (car PAIR) = list of lines before the comment
   (cdr PAIR) = comment"
+  (declare (optimize (speed 3) (safety 0) (debug 0)))
+  (declare (type simple-string text header comment))
+  (declare (type fixnum start size last-char-pos newline-position))
   (let* ((text (babel:octets-to-string data
                                        :start start
                                        :end (+ start size)
                                        :errorp nil
                                        :encoding :utf-8))
-         (last-char-pos (1- (length text)))
-         (newline-position (min (find-consecutive-newlines text)
-                                last-char-pos))
-         (header (subseq text 0 newline-position))
+         (last-char-pos (1- (the fixnum (length text))))
+         (newline-position (the fixnum (min (the fixnum (find-consecutive-newlines text))
+                                last-char-pos)))
+         (header (the simple-string (subseq text 0 newline-position)))
          (comment (if (> (1+ last-char-pos) newline-position)
                       (subseq text (+ 2 newline-position) last-char-pos)
                       "")))
@@ -149,17 +152,15 @@ nothing found"
   (let* ((parsed-data (parse-text-git-data data start size))
          (commit (make-instance 'commit :hash hash :comment (cdr parsed-data))))
     (with-slots (tree author committer parents) commit
-      (mapcar
-       (lambda (line)
-         (let* ((space-pos (position #\Space line))
-                (key (subseq line 0 space-pos))
-                (value (subseq line (1+ space-pos))))
-           (switch (key :test #'string=)
-             ("tree" (setf tree value))
-             ("author" (setf author value))
-             ("committer" (setf committer value))
-             ("parent" (push value parents)))))
-       (car parsed-data)))
+      (dolist (line (car parsed-data))
+        (let* ((space-pos (position #\Space line))
+               (key (subseq line 0 space-pos))
+               (value (subseq line (1+ space-pos))))
+          (switch (key :test #'string=)
+            ("tree" (setf tree value))
+            ("author" (setf author value))
+            ("committer" (setf committer value))
+            ("parent" (push value parents))))))
      commit))
     
 
@@ -167,13 +168,11 @@ nothing found"
 (defmethod parse-git-object ((obj (eql :tag)) data hash &key start size)
   (let* ((parsed-data (parse-text-git-data data start size))
          (self (make-instance 'tag :hash hash :comment (cdr parsed-data))))
-    (mapcar
-     (lambda (line)
-       (let* ((space-pos (position #\Space line))
-              (key (subseq line 0 space-pos))
-              (value (subseq line (1+ space-pos))))
-         (setf (slot-value self (intern (string-upcase key))) value)))
-     (car parsed-data))
+    (dolist (line (car parsed-data))
+      (let* ((space-pos (position #\Space line))
+             (key (subseq line 0 space-pos))
+             (value (subseq line (1+ space-pos))))
+        (setf (slot-value self (intern (string-upcase key))) value)))
     self))
 
 

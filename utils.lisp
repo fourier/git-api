@@ -180,10 +180,12 @@ If RESULT array is given - write to this array"
         (setf (aref result x) (the fixnum (+ (the fixnum (ash upper-val 4)) lower-val))))))
   result)
 
-  
-(defun make-vector-view (vector start end)
+@export  
+(defun make-array-view (vector start end)
   "Returns array displaced to the vector (starting with start, ending on end)"
   (make-array (- end start 1)
               :displaced-to vector
-              :displaced-index-offset start))
+              :displaced-index-offset start
+              :element-type (array-element-type vector)))
+
 

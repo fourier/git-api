@@ -67,7 +67,7 @@ in .git/objects are containing objects (not a packfiles or info)")
     (unless (every #'fad:file-exists-p
                    (mapcar (curry #'concatenate 'string path)
                            '(".git/HEAD" ".git/objects" ".git/config" ".git/refs")))
-      (error 'not-existing-repository-error
+      (error 'corrupted-repository-error
              :text (format nil "Repository in ~a has a corrupted structure" path)))
     ;; collect all pack files
     (let ((files (directory (repo-file "objects/pack/*.pack"))))
@@ -130,7 +130,7 @@ in .git/objects are containing objects (not a packfiles or info)")
 
 
 @export
-(defmethod get-object-by-hash ((self git-repo) hash)
+(defmethod get-object-by-hash ((self git-repo) hash &key result-block)
   "Returns the object by the given hash string"
   ;; first try if the file exists
   (with-slots (path pack-files object-files) self
@@ -210,9 +210,8 @@ refs/tags/v1.0"
         (children (list object)))
     (loop while children
           do
-          (progn
-            (let* ((current (pop children))
-                   (kids (get-commit-parents self current)))
-              (mapcar (lambda (x) (setf (gethash (object-hash x) tree) x) (push x children))
-                      (remove-if (lambda(x) (gethash (object-hash x) tree)) kids)))))
+          (let* ((current (pop children))
+                 (kids (get-commit-parents self current)))
+            (dolist (x (remove-if (lambda(x) (gethash (object-hash x) tree)) kids))
+              (setf (gethash (object-hash x) tree) x) (push x children))))
     tree))
