@@ -125,7 +125,8 @@ NOTE: OFFSET is ignored for streams"
 (defun sha1-array-to-hex (array offset)
   ;;(declare (:explain :variables :calls))
   (declare (optimize (speed 3) (safety 0) (debug 0)))
-  (declare (type fixnum offset lower-byte upper-byte))
+  (declare (type fixnum offset))
+  (declare (type (array (unsigned-byte 8)) array))
   (let ((hex (make-array 40 :element-type 'character :adjustable nil))) 
     (dotimes (x 20)
       (declare (type fixnum x))
@@ -134,6 +135,7 @@ NOTE: OFFSET is ignored for streams"
         (let* ((upper-byte (ash byte -4))
                (lower-byte (the fixnum (- byte (the fixnum (ash upper-byte 4)))))
                (pos (the fixnum (* 2 x))))
+          (declare (type fixnum offset lower-byte upper-byte))
           (setf (schar hex pos) (digit-to-hex upper-byte)
                 (schar hex (the fixnum (1+ pos))) (digit-to-hex lower-byte)))))
     hex))
@@ -141,7 +143,6 @@ NOTE: OFFSET is ignored for streams"
 
 (defun sha1-stream-to-hex (stream)
   (declare (optimize (speed 3) (safety 0) (debug 0)))
-  (declare (type fixnum offset lower-byte upper-byte))
   (let ((hex (make-array 40 :element-type 'character :adjustable nil))) 
     (dotimes (x 20)
       (declare (type fixnum x))
@@ -150,6 +151,7 @@ NOTE: OFFSET is ignored for streams"
         (let* ((upper-byte (ash byte -4))
                (lower-byte (the fixnum (- byte (the fixnum (ash upper-byte 4)))))
                (pos (the fixnum (* 2 x))))
+          (declare (type fixnum pos lower-byte upper-byte))
           (setf (schar hex pos) (digit-to-hex upper-byte)
                 (schar hex (the fixnum (1+ pos))) (digit-to-hex lower-byte)))))
     hex))
@@ -162,7 +164,6 @@ to the byte array.
 If RESULT array is given - write to this array"
   (declare (optimize (speed 3) (safety 0)))
   ;;(declare (:explain :variables :calls))
-  (declare (fixnum upper-val lower-val))
   (unless result
     (setf result (make-array 20 :element-type '(unsigned-byte 8) :adjustable nil)))
   (macrolet ((hex-to-number (hex)
@@ -177,6 +178,7 @@ If RESULT array is given - write to this array"
       (let* ((pos (the fixnum (* 2 x)))
              (upper-val (hex-to-number (schar sha1string pos)))
              (lower-val (hex-to-number (schar sha1string (the fixnum (1+ pos))))))
+        (declare (fixnum pos upper-val lower-val))
         (setf (aref result x) (the fixnum (+ (the fixnum (ash upper-val 4)) lower-val))))))
   result)
 

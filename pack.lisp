@@ -11,7 +11,7 @@
 ;; read the source: https://github.com/git/git/blob/master/pack-write.c
 ;;
 (defpackage #:git-api.pack
-  (:use #:cl #:cl-annot.class #:alexandria #:git-api.utils))
+  (:use #:cl #:cl-annot.class #:alexandria #:git-api.utils #:git-api.pack.get-data))
 
 
 (in-package #:git-api.pack)
@@ -421,7 +421,7 @@ little-endian format, therefore the most significant byte comes last"
                       (hash (make-array +sha1-size+
                                         :element-type '(unsigned-byte 8)
                                         :adjustable nil)))
-                  (declare (type (simple-array (unsigned-byte 8) (#.+sha1-size+)) hash)
+                  (declare (type (simple-array (unsigned-byte 8) *) hash)
                            (type integer offset))
                   (read-sequence hash stream)                  
                   (setf (aref index i) (cons offset hash)
@@ -563,49 +563,13 @@ HASH is as SHA1 code as a byte array (20 values)"
               (stream-get-object-by-array-hash stream entry)))))))
 
 
-(defparameter *temporary-read-buffer* (make-array 8192
-                                                  :element-type '(unsigned-byte 8)
-                                                  :fill-pointer t))
-
-
-(defparameter *temporary-output-buffer* (make-array 8192
-                                                    :element-type '(unsigned-byte 8)
-                                                    :fill-pointer 0))
-
-(defparameter *use-temporary-output-buffer* t)
-
-(defun get-object-data (entry stream)
-  "Return the uncompressed data for pack-entry from the opened file stream.
-BUFFER is a optional buffer to read compressed data"
-  ;; move to position data-offset
-  (file-position stream (pack-entry-data-offset entry))
-  (let ((read-buffer
-         (if (> (pack-entry-compressed-size entry) 8192)
-             (make-array (pack-entry-compressed-size entry)
-                         :element-type '(unsigned-byte 8)
-                         :fill-pointer t)
-             *temporary-read-buffer*))
-        (output-buffer
-         (if (and *use-temporary-output-buffer*
-                  (<= (pack-entry-uncompressed-size entry) 8192))
-             (progn
-               (setf (fill-pointer *temporary-output-buffer*) 0)
-               *temporary-output-buffer*)
-             (make-array (pack-entry-uncompressed-size entry)
-                         :element-type '(unsigned-byte 8)
-                         :fill-pointer 0))))
-    ;; sanity check
-    (assert (>= (array-total-size read-buffer) (pack-entry-compressed-size entry)))
-    ;; read the data
-    (read-sequence read-buffer stream :end (pack-entry-compressed-size entry))
-    ;; uncompress chunk
-    (zlib:uncompress read-buffer :output-buffer output-buffer :start 0 :end (pack-entry-compressed-size entry))))
-
-
 (defmethod get-object-chunk ((entry pack-entry) (pack pack-file) stream)
   "Return the uncompressed data for pack-entry from the opened file stream"
   (declare (ignore pack))
-  (get-object-data entry stream))
+  (get-object-data (pack-entry-data-offset entry)
+                   (pack-entry-compressed-size entry)
+                   (pack-entry-uncompressed-size entry)
+                   stream))
 
 
 (defmethod get-object-chunk ((entry pack-entry-delta) (pack pack-file) stream)
@@ -620,7 +584,10 @@ BUFFER is a optional buffer to read compressed data"
     ;; set the type from parent
     (setf (pack-entry-type entry) type)
     ;; merge
-    (apply-delta parent (get-object-data entry stream)))))
+    (apply-delta parent (get-object-data (pack-entry-data-offset entry)
+                                         (pack-entry-compressed-size entry)
+                                         (pack-entry-uncompressed-size entry)
+                                         stream)))))
     
 
 (defun apply-delta (base delta)
