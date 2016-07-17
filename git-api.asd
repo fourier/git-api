@@ -18,6 +18,7 @@
                #:ironclad)      ; sha1 checksum - X11/MIT-like license
   :serial t
   :components ((:file "utils")
+               (:file "zlib-wrapper")
                (:file "pack-get-data")
                (:file "pack")
                (:file "object")
