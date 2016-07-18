@@ -578,7 +578,7 @@ HASH is as SHA1 code as a byte array (20 values)"
   (file-position stream (pack-entry-data-offset entry))
   ;; current object is delta. Let's get its parent's chunk
   ;; (recursively if necessary)
-  (let ((*use-temporary-output-buffer* nil))
+  (let ((*try-use-temporary-output-buffer* nil))
   (multiple-value-bind (parent type)
       (pack-get-object-by-array-hash pack (pack-entry-base-hash entry))
     ;; set the type from parent
