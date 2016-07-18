@@ -23,7 +23,7 @@
                                                     :element-type '(unsigned-byte 8)
                                                     :fill-pointer 0))
 @export
-(defparameter *try-use-temporary-output-buffer* nil)
+(defparameter *try-use-temporary-output-buffer* t)
 
 @export
 (defun get-object-data-old (offset compressed-size uncompressed-size stream)
@@ -138,7 +138,7 @@ BUFFER is a optional buffer to read compressed data"
                 do (setf (aref output-buffer i) val)))
         output-buffer))))
 
-
+(defvar *uncompressed-size-ptr* (cffi:foreign-alloc :unsigned-long))
 
 @export
 (defun get-object-data (offset compressed-size uncompressed-size stream)
@@ -146,27 +146,22 @@ BUFFER is a optional buffer to read compressed data"
   (file-position stream offset)
   (let ((input *temporary-static-read-buffer*)
         (output *temporary-static-output-buffer*)
-        (output-buffer *temporary-static-output-buffer*)
-        (uncompressed-size-ptr
-         (cffi:foreign-alloc :unsigned-long)))
+        (output-buffer (make-array uncompressed-size 
+                                   :element-type '(unsigned-byte 8))))
     ;; set value of the pointer to size output buffer    
-    (setf (cffi:mem-ref uncompressed-size-ptr :unsigned-long) uncompressed-size)
+    (setf (cffi:mem-ref *uncompressed-size-ptr* :unsigned-long) uncompressed-size)
     (handler-case
         (progn
           ;; check if we requested to use temporary buffers
           (unless *try-use-temporary-output-buffer*
             (setf input (make-static-vector compressed-size)
-                  output (make-static-vector uncompressed-size)
-                  output-buffer (make-array uncompressed-size 
-                                            :element-type '(unsigned-byte 8))))
+                  output (make-static-vector uncompressed-size)))
           ;; check if size of input buffer suits
           (when (and *try-use-temporary-output-buffer* (> compressed-size 8192))
             (setf input (make-static-vector compressed-size)))
           ;; and check if size of output buffer suits 
           (when (and *try-use-temporary-output-buffer* (> uncompressed-size 8192))
-            (setf output (make-static-vector uncompressed-size)
-                  output-buffer (make-array uncompressed-size 
-                                            :element-type '(unsigned-byte 8))))
+            (setf output (make-static-vector uncompressed-size)))
           ;; read the data
           (read-sequence input stream :end compressed-size)
           ;; uncompress chunk
@@ -174,7 +169,7 @@ BUFFER is a optional buffer to read compressed data"
                  (result
                   (git-api.zlib-wrapper::uncompress
                    foreign-output
-                   uncompressed-size-ptr
+                   *uncompressed-size-ptr*
                    (static-vector-pointer input)
                    compressed-size)))
             ;; check for error
@@ -190,7 +185,6 @@ BUFFER is a optional buffer to read compressed data"
               (free-static-vector input))
             (unless (eq output *temporary-static-output-buffer*)
               (free-static-vector output))
-            (cffi:foreign-free uncompressed-size-ptr)
             ;; good, output buffer now contains the data
             output-buffer))
       (error (e)
@@ -200,5 +194,4 @@ BUFFER is a optional buffer to read compressed data"
             (free-static-vector input))
           (unless (eq output *temporary-static-output-buffer*)
             (free-static-vector output))
-          (cffi:foreign-free uncompressed-size-ptr)
           (error e))))))
