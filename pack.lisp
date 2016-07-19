@@ -118,11 +118,7 @@ For deltas additional steps required."))
             (:tag "tag"))
           (pack-entry-uncompressed-size entry)
           (pack-entry-compressed-size entry)
-          (pack-entry-offset entry))
-  (when (pack-entry-base-hash entry)
-    (format stream " ~a"
-            (pack-entry-base-hash entry)))
-  (format stream "~%"))
+          (pack-entry-offset entry)))
 
 
 (defclass pack-entry-delta (pack-entry)
@@ -130,6 +126,12 @@ For deltas additional steps required."))
               :accessor pack-entry-base-hash
               :documentation "the SHA1 code of the base object"))
   (:documentation "Pack entry of type delta"))
+
+
+(defmethod print-object :after ((entry pack-entry-delta) stream)
+  (when (pack-entry-base-hash entry)
+    (format stream " ~a"
+            (pack-entry-base-hash entry))))
 
 
 @export-class
@@ -146,6 +148,7 @@ For deltas additional steps required."))
   (with-slots (pack-filename) self
     (parse-pack-file-impl self pack-filename)))
 
+
 @export
 (defmethod pack-open-stream ((self pack-file))
   "Opens the file stream for the pack-file SELF.
@@ -156,6 +159,7 @@ Don't forget to close it with corresponding call pack-close-stream"
       (close pack-stream)
       (setf pack-stream nil))
     (setf pack-stream (open pack-filename :direction :input :element-type '(unsigned-byte 8)))))
+
 
 @export
 (defmethod pack-close-stream ((self pack-file))
@@ -225,20 +229,21 @@ INDEX is a sorted list of pairs (sha1 . offset)"
   (let ((table (make-hash-table :test #'equalp :size (length index)))
         (file-length (file-length stream)))
     ;; fill the table.
-    (loop for i from 0 below (length index) do
-          (let* ((offset (car (aref index i)))
-                 ;; calculate the compressed size (size in pack file).
-                 ;; This size includes the header size as well
-                 ;; The size is the  difference between data offset of the current
-                 ;; and next entry...
-                 (compressed-size 
-                  (- (if (< i (1- (length index)))
-                         (car (aref index (1+ i)))
-                         ;; or end of file(without SHA-1 trailer of 20 bytes)
-                         (- file-length 20)) 
-                     offset)))
-            (setf (gethash (cdr (aref index i)) table)
-                  (cons offset compressed-size))))
+    (loop for i from 0 below (length index)
+          for offset = (car (aref index i))
+          ;; calculate the compressed size (size in pack file).
+          ;; This size includes the header size as well
+          ;; The size is the  difference between data offset of the current
+          ;; and next entry...
+          for compressed-size =
+          (- (if (< i (1- (length index)))
+                 (car (aref index (1+ i)))
+                 ;; or end of file(without SHA-1 trailer of 20 bytes)
+                 (- file-length 20)) 
+             offset)
+          do
+          (setf (gethash (cdr (aref index i)) table)
+                (cons offset compressed-size)))
     table))
                                   
 
@@ -306,10 +311,9 @@ And finally the length is 6144 + 1733 = 7833"
     ;; calculate variable-length integer (uncompressed size)
     (loop while (>= head 128)
           do
-          (progn 
-            (setf head (the fixnum (read-byte stream)))
-            (incf len (the fixnum (ash (the fixnum (logand 127 head)) shift)))
-            (incf shift 7)))
+          (setf head (the fixnum (read-byte stream)))
+          (incf len (the fixnum (ash (the fixnum (logand 127 head)) shift)))
+          (incf shift 7))
     ;; check if type is OBJ-REF-DELTA or OBJ-OFS-DELTA
     (switch (type)
       (OBJ-REF-DELTA
@@ -338,10 +342,9 @@ offset encoding:
          (value (logand 127 head)))
     (loop while (>= head 128)
           do
-          (progn
-            (incf value)
-            (setf head (read-byte stream))
-            (setf value (+ (ash value 7) (logand head 127)))))
+          (incf value)
+          (setf head (read-byte stream))
+          (setf value (+ (ash value 7) (logand head 127))))
     value))
 
 
@@ -360,15 +363,14 @@ little-endian format, therefore the most significant byte comes last"
          (shift 7))
     (loop while (>= head 128)
           do
-          (progn
-            ;; next byte
-            (setf head (read-byte stream))
-            ;; shift read byte (without MSB) to accumulated shift
-            ;; so every next byte is more significant than previous
-            ;; and accumulate value
-            (incf value (ash (logand head 127) shift))
-            ;; increase a shift for the next significant byte
-            (incf shift 7)))
+          ;; next byte
+          (setf head (read-byte stream))
+          ;; shift read byte (without MSB) to accumulated shift
+          ;; so every next byte is more significant than previous
+          ;; and accumulate value
+          (incf value (ash (logand head 127) shift))
+          ;; increase a shift for the next significant byte
+          (incf shift 7))
     value))
   
                               
@@ -447,7 +449,6 @@ less or equal to 256, as the byte <= 256"
           do
           (setf (aref fanout i) (read-ub32/be stream)))
     fanout))
-
           
     
 (defun read-offsets (stream size)
@@ -541,14 +542,22 @@ HASH is as SHA1 code as as string (40 hex characters)"
 
 
 (defmethod pack-get-object-by-array-hash ((self pack-file) hash)
-  "Find the object in the packfile. Return the uncompressed object
-from the pack file as a vector of bytes.
-HASH is as SHA1 code as a byte array (20 values)"
+  "Find the object in the packfile.
+HASH is as SHA1 code as a byte array (20 values)
+Returns (values):
+- uncompressed object from the pack file as a vector of bytes.
+- size of this vector (number of meaningful bytes)
+- type of object, symbol"
   (flet ((stream-get-object-by-array-hash (stream entry)
            (when (typep entry 'cons) ; not an entry yet, create one
              ;; create new entry will add it automatically to the index-table
              (setf entry (create-new-entry self hash entry stream)))
-           (values (get-object-chunk entry self stream) (pack-entry-type entry))))
+           ;; get-object chunk returns values chunk,size
+           (multiple-value-bind (chunk size)
+               (get-object-chunk entry self stream)
+             (values chunk
+                     size
+                     (pack-entry-type entry)))))
     (with-slots (pack-filename index-table pack-stream) self
       ;; find the object
       (when-let (entry (gethash hash index-table))
@@ -564,30 +573,41 @@ HASH is as SHA1 code as a byte array (20 values)"
 
 
 (defmethod get-object-chunk ((entry pack-entry) (pack pack-file) stream)
-  "Return the uncompressed data for pack-entry from the opened file stream"
+  "Return the uncompressed data for pack-entry from the opened file stream
+and size of this data as values(data, size)"
   (declare (ignore pack))
-  (get-object-data (pack-entry-data-offset entry)
-                   (pack-entry-compressed-size entry)
-                   (pack-entry-uncompressed-size entry)
-                   stream))
+  (values 
+   (get-object-data (pack-entry-data-offset entry)
+                    (pack-entry-compressed-size entry)
+                    (pack-entry-uncompressed-size entry)
+                    stream)
+   (pack-entry-uncompressed-size entry)))
+
 
 
 (defmethod get-object-chunk ((entry pack-entry-delta) (pack pack-file) stream)
-  "Return the uncompressed data for pack-entry from the opened file stream"
+  "Return the uncompressed data for pack-entry from the opened file stream
+and size of this data as values(data, size).
+Here size != uncompressed size of data since total size of deltified
+object is known only when we parse delta object."
   ;; move to position data-offset
   (file-position stream (pack-entry-data-offset entry))
   ;; current object is delta. Let's get its parent's chunk
   ;; (recursively if necessary)
   (let ((*try-use-temporary-output-buffer* nil))
-  (multiple-value-bind (parent type)
-      (pack-get-object-by-array-hash pack (pack-entry-base-hash entry))
-    ;; set the type from parent
-    (setf (pack-entry-type entry) type)
-    ;; merge
-    (apply-delta parent (get-object-data (pack-entry-data-offset entry)
-                                         (pack-entry-compressed-size entry)
-                                         (pack-entry-uncompressed-size entry)
-                                         stream)))))
+    (multiple-value-bind (parent size type)
+        (pack-get-object-by-array-hash pack (pack-entry-base-hash entry))
+      (declare (ignore size))
+      ;; set the type from parent
+      (setf (pack-entry-type entry) type)
+      ;; merge
+      (let ((chunk 
+             (apply-delta parent (get-object-data (pack-entry-data-offset entry)
+                                                  (pack-entry-compressed-size entry)
+                                                  (pack-entry-uncompressed-size entry)
+                                                  stream))))
+        ;; finally return chunk
+        (values chunk (length chunk))))))
     
 
 (defun apply-delta (base delta)

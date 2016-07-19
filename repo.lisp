@@ -140,24 +140,25 @@ in .git/objects are containing objects (not a packfiles or info)")
             ;; iterate oven all pack files trying to find the one having hash
             (loop for pack in pack-files
                   when
-                  (= (length
+                  (= (length  
                       (setf result (multiple-value-list
                                     (pack-get-object-by-hash pack hash))))
-                     2)
+                     3)
                   return pack)))
       ;; ok pack and corresponding index entry found 
       (if (and result found-pack)
           ;; get the data from pack file
-          ;; pack-get-object-by-hash returns values: (data, type)
+          ;; pack-get-object-by-hash returns values: (data, size, type)
           (let ((data (car result))
-                (type (cadr result)))
+                (size (cadr result))
+                (type (caddr result)))
             (when data
               ;; and finally parse the data
               (parse-git-object type
                                 data
                                 hash
                                 :start 0
-                                :size (length data))))
+                                :size size)))
           ;; otherwise read git file
           (parse-git-file (gethash hash object-files))))))
 

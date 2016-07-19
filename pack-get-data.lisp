@@ -98,9 +98,7 @@ BUFFER is a optional buffer to read compressed data"
         (output *temporary-static-output-buffer*)
         (output-buffer
          (if (and *try-use-temporary-output-buffer* (<= uncompressed-size 8192))
-             (progn
-               (setf (fill-pointer *temporary-output-buffer*) uncompressed-size)
-               *temporary-output-buffer*)
+             *temporary-output-buffer*
              (make-array uncompressed-size 
                          :element-type '(unsigned-byte 8)))))
     ;; set value of the pointer to size output buffer    
