@@ -74,19 +74,19 @@
 
 @export-class
 (defclass pack-entry  ()
-  ((offset :initarg :offset :initform nil
+  ((offset :initarg :offset :initform nil :type fixnum
            :accessor pack-entry-offset
            :documentation "offset of the entry in a pack file. Offset followed by the VLI-length")
-   (data-offset :initarg :data-offset :initform nil
+   (data-offset :initarg :data-offset :initform nil :type fixnum
                 :accessor pack-entry-data-offset
                 :documentation "real offset to the place in file there the compressed data starts")
-   (compressed-size :initarg :compressed-size :initform nil
+   (compressed-size :initarg :compressed-size :initform nil :type fixnum
                     :accessor pack-entry-compressed-size
                     :documentation "size in bytes of the compressed data")
-   (uncompressed-size :initarg :uncompressed-size :initform nil
+   (uncompressed-size :initarg :uncompressed-size :initform nil :type fixnum
                       :accessor pack-entry-uncompressed-size
                       :documentation "size the data should hold after the unpacking")
-   (type :initarg :type :initform nil
+   (type :initarg :type :initform nil :type fixnum
          :reader pack-entry-type
          :documentation "type of the entry. Ether commit(1), tree(2), blob(3) or tag(4"))
   (:documentation "Entry in the pack file. This struct represents all the information

@@ -96,11 +96,7 @@ BUFFER is a optional buffer to read compressed data"
   (file-position stream offset)
   (let ((input *temporary-static-read-buffer*)
         (output *temporary-static-output-buffer*)
-        (output-buffer
-         (if (and *try-use-temporary-output-buffer* (<= uncompressed-size 8192))
-             *temporary-output-buffer*
-             (make-array uncompressed-size 
-                         :element-type '(unsigned-byte 8)))))
+        (output-buffer *temporary-static-output-buffer*))
     ;; set value of the pointer to size output buffer    
     (setf (cffi:mem-ref *uncompressed-size-ptr* :unsigned-long) uncompressed-size)
     (handler-case
@@ -108,13 +104,17 @@ BUFFER is a optional buffer to read compressed data"
           ;; check if we requested to use temporary buffers
           (unless *try-use-temporary-output-buffer*
             (setf input (make-static-vector compressed-size)
-                  output (make-static-vector uncompressed-size)))
+                  output (make-static-vector uncompressed-size)
+                  output-buffer (make-array uncompressed-size 
+                                            :element-type '(unsigned-byte 8))))
           ;; check if size of input buffer suits
           (when (and *try-use-temporary-output-buffer* (> compressed-size 8192))
             (setf input (make-static-vector compressed-size)))
           ;; and check if size of output buffer suits 
           (when (and *try-use-temporary-output-buffer* (> uncompressed-size 8192))
-            (setf output (make-static-vector uncompressed-size)))
+            (setf output (make-static-vector uncompressed-size)
+                  output-buffer (make-array uncompressed-size 
+                                            :element-type '(unsigned-byte 8))))
           ;; read the data
           (read-sequence input stream :end compressed-size)
           ;; uncompress chunk

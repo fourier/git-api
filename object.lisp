@@ -15,11 +15,11 @@
 
 @export-class
 (defclass commit (git-object)
-  ((tree :initarg :tree :reader commit-tree :initform "")
-   (author :initarg :author :reader commit-author :initform "")
-   (committer :initarg :committer :reader commit-committer :initform "")
-   (comment :initarg :comment :reader commit-comment :initform "")
-   (parents :initarg :parents :reader commit-parents :initform nil))
+  ((tree :initarg :tree :reader commit-tree :initform "" :type simple-string)
+   (author :initarg :author :reader commit-author :initform "" :type simple-string)
+   (committer :initarg :committer :reader commit-committer :initform "" :type simple-string)
+   (comment :initarg :comment :reader commit-comment :initform "" :type string)
+   (parents :initarg :parents :reader commit-parents :initform nil :type list))
   (:documentation "Git Commit object"))
 
 (defmethod print-object ((self commit) stream)
@@ -32,7 +32,7 @@
 
 @export-class
 (defclass blob (git-object)
-  ((content :initarg :content :reader blob-content :initform nil))
+  ((content :initarg :content :reader blob-content :initform nil :type '(vector unsigned-byte 8)))
   (:documentation "Git Blob object"))
 
 (defmethod print-object ((self blob) stream)
@@ -118,10 +118,12 @@ and returns a PAIR:
          (last-char-pos (1- (the fixnum (length text))))
          (newline-position (the fixnum (min (the fixnum (find-consecutive-newlines text))
                                 last-char-pos)))
-         (header (the simple-string (subseq text 0 newline-position)))
+         (header (the string (subseq text 0 newline-position)))
          (comment (if (> (1+ last-char-pos) newline-position)
                       (subseq text (+ 2 newline-position) last-char-pos)
                       "")))
+    (declare (type string text header comment)
+             (type fixnum last-char-pos newline-position))
     (cons (split-sequence:split-sequence #\newline header)
           comment)))
 
@@ -134,17 +136,15 @@ nothing found"
            (type fixnum first last))
   (declare (optimize (speed 3) (safety 0)))
   (if (/= first last)
-      (let ((next (the fixnum (1+ first))))
-        (declare (type fixnum next))
-        (loop while (/= next last)
-              do
-              (if (char= (the character (char str first))
-                         (the character (char str next)) #\newline)
-                  (return first)
-                  (progn
-                    (incf first)
-                    (incf next)))
-              finally (return last)))
+      (loop with next fixnum = (1+ first)
+            while (/= next last)
+            when (char= (the character (char str first))
+                        (the character (char str next)) #\newline)
+            return first
+            do
+            (incf first)
+            (incf next)
+            finally (return last))
       last))
 
 
