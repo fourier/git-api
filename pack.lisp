@@ -1,4 +1,4 @@
-;;;; pack.lisp
+ ;;;; pack.lisp
 ;;
 ;; This package reads the git pack and index files
 ;; according to the official documentation:
@@ -418,16 +418,16 @@ little-endian format, therefore the most significant byte comes last"
           ;; the offsets table is a hash table with the offset as a key
           ;; and the hash as a value
           (setf offsets-table (make-hash-table :test #'eq :size size))
-          (loop for i fixnum from 0 below size do
-                (let ((offset (aref offsets i))
-                      (hash (make-array +sha1-size+
-                                        :element-type '(unsigned-byte 8)
-                                        :adjustable nil)))
-                  (declare (type (simple-array (unsigned-byte 8) *) hash)
-                           (type integer offset))
-                  (read-sequence hash stream)                  
-                  (setf (aref index i) (cons offset hash)
-                        (gethash offset offsets-table) hash)))
+          (loop for i fixnum from 0 below size
+                for offset fixnum = (aref offsets i)
+                for hash =
+                (make-array +sha1-size+
+                            :element-type '(unsigned-byte 8)
+                            :adjustable nil)
+                do 
+                (read-sequence hash stream)                  
+                (setf (aref index i) (cons offset hash)
+                      (gethash offset offsets-table) hash))
           ;; finally return the sorted array of conses (offset . hash)
           (sort index (lambda (x y) (declare (integer x y)) (< x y)) :key (lambda (x) (the integer (car x)))))))))
 
@@ -594,6 +594,10 @@ object is known only when we parse delta object."
   (file-position stream (pack-entry-data-offset entry))
   ;; current object is delta. Let's get its parent's chunk
   ;; (recursively if necessary)
+  ;; bind the special variable to nil to prevent using static arrays
+  ;; while recursively building the delta
+  ;; otherwise we can end up in a situation when the parent and
+  ;; our arrays is the same static array
   (let ((*try-use-temporary-output-buffer* nil))
     (multiple-value-bind (parent size type)
         (pack-get-object-by-array-hash pack (pack-entry-base-hash entry))
@@ -606,7 +610,7 @@ object is known only when we parse delta object."
                                                   (pack-entry-compressed-size entry)
                                                   (pack-entry-uncompressed-size entry)
                                                   stream))))
-        ;; finally return chunk
+        ;; finally return chunk and its length
         (values chunk (length chunk))))))
     
 

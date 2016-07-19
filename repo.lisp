@@ -86,7 +86,7 @@ in .git/objects are containing objects (not a packfiles or info)")
             (loop for line = (read-line stream nil)
                   while line
                   ;; skip comments
-                  unless (starts-with #\# (string-trim '(#\Space #\Tab) line))            
+                  unless (starts-with #\# (string-trim '(#\Space #\Tab) line))
                   do
                   (let ((ref (split-sequence:split-sequence #\space line)))
                     ;; check if the current line is the peeled ref (points to
@@ -110,13 +110,13 @@ in .git/objects are containing objects (not a packfiles or info)")
       (loop for dir in object-dirs
             do
             (loop for fil in (mapcar #'namestring (fad:list-directory dir))
+                  for pos = (position #\/ fil :from-end t)
                   do
-                  (let ((pos (position #\/ fil :from-end t)))
-                    (setf (gethash
-                           (concatenate 'string (subseq fil (- pos 2) pos)
-                                        (subseq fil (1+ pos)))
-                           object-files)
-                          (pathname fil))))))))
+                  (setf (gethash
+                         (concatenate 'string (subseq fil (- pos 2) pos)
+                                      (subseq fil (1+ pos)))
+                         object-files)
+                        (pathname fil)))))))
                                   
     
 
