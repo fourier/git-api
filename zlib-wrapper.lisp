@@ -1,7 +1,7 @@
 ;;;; zlib-wrapper.lisp
 (defpackage #:git-api.zlib-wrapper
-  (:use #:cl #:cl-annot.class #:alexandria #:cffi)
-  (:export uncompress))
+  (:use #:cl #:cffi)
+  (:export uncompress *zlib-loaded*))
 
 (in-package #:git-api.zlib-wrapper)
 
@@ -11,7 +11,14 @@
 (define-foreign-library zlib
   (t (:default "libz")))
 
-(use-foreign-library zlib)
+
+(defvar *zlib-loaded* nil
+  "Variable set to T if we were able to load ZLIB C library")
+
+;; try to load foreign library
+(ignore-errors 
+  (use-foreign-library zlib)
+  (setf *zlib-loaded* t))
 
 ;;----------------------------------------------------------------------------
 ;; Constants 
