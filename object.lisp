@@ -13,6 +13,7 @@
   ((hash :initarg :hash :reader object-hash :type '(vector unsigned-byte 8)))
   (:documentation "Base class for Git objects"))
 
+
 @export-class
 (defclass commit (git-object)
   ((tree :initarg :tree :reader commit-tree :initform "" :type simple-string)

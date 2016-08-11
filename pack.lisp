@@ -77,16 +77,16 @@
   ((offset :initarg :offset :initform nil :type fixnum
            :accessor pack-entry-offset
            :documentation "offset of the entry in a pack file. Offset followed by the VLI-length")
-   (data-offset :initarg :data-offset :initform nil :type fixnum
+   (data-offset :initarg :data-offset :initform 0 :type fixnum
                 :accessor pack-entry-data-offset
                 :documentation "real offset to the place in file there the compressed data starts")
-   (compressed-size :initarg :compressed-size :initform nil :type fixnum
+   (compressed-size :initarg :compressed-size :initform 0 :type fixnum
                     :accessor pack-entry-compressed-size
                     :documentation "size in bytes of the compressed data")
-   (uncompressed-size :initarg :uncompressed-size :initform nil :type fixnum
+   (uncompressed-size :initarg :uncompressed-size :initform 0 :type fixnum
                       :accessor pack-entry-uncompressed-size
                       :documentation "size the data should hold after the unpacking")
-   (type :initarg :type :initform nil :type fixnum
+   (type :initarg :type :initform nil :type (or fixnum keyword null)
          :reader pack-entry-type
          :documentation "type of the entry. Ether commit(1), tree(2), blob(3) or tag(4"))
   (:documentation "Entry in the pack file. This struct represents all the information
@@ -100,6 +100,10 @@ For deltas additional steps required."))
 
 
 (defmethod (setf pack-entry-type) (value (entry pack-entry))
+  "Setter for the entry type. VALUE is the integer
+from cache.h. The setter will map the VALUE to the appropriate
+keyword, unless the entry type is delta, in this case the VALUE
+will remain as is"
   (setf (slot-value entry 'type) value)
   (switch (value)
     (OBJ-COMMIT (setf (slot-value entry 'type) :commit))
@@ -108,8 +112,10 @@ For deltas additional steps required."))
     (OBJ-BLOB (setf (slot-value entry 'type) :blob)))
   (slot-value entry 'type))
 
+
 (defmethod print-object ((entry pack-entry) stream)
-  ;; type size size-in-packfile offset-in-packfile [depth base-SHA-1]
+  "Print to STREAM the entry contents in the format:
+TYPE SIZE SIZE-IN-PACKFILE OFFSET-IN-PACKFILE"
   (format stream "~a ~a ~a ~a"
           (switch ((pack-entry-type entry))
             (:commit "commit")
@@ -129,17 +135,26 @@ For deltas additional steps required."))
 
 
 (defmethod print-object :after ((entry pack-entry-delta) stream)
+  "Append to the information printed to the stream with base-SHA-1"
   (when (pack-entry-base-hash entry)
     (format stream " ~a"
-            (pack-entry-base-hash entry))))
+            (sha1-to-hex (pack-entry-base-hash entry)))))
 
 
 @export-class
 (defclass pack-file ()
-  ((pack-filename :initarg :pack-filename :initform nil :reader pack-filename)
-   (pack-stream :initarg :pack-stream :initform nil :reader pack-stream)
-   (index-table :initform nil :reader index-table)
-   (offsets-table :initform nil :reader offsets-table))
+  ((pack-filename :initarg :pack-filename :initform nil :reader pack-filename
+                  :type string
+                  :documentation "Full path to the PACK file")
+   (pack-stream :initarg :pack-stream :initform nil :reader pack-stream
+                :type (or stream null)
+                :documentation "Stream for pack file (if already opened)")
+   (index-table :initform nil :reader index-table
+                :documentation "The table from parsed index file:
+The hash table with the mapping between sha1 binary code and entry")
+   (offsets-table :initform nil :reader offsets-table
+                  :documentation
+                  "A hash table with the offset as a key and the hash as a value"))
   (:documentation "A class representing the pack file contents"))
 
 
@@ -492,10 +507,16 @@ less or equal to 256, as the byte <= 256"
 
 @export
 (defun parse-pack-file (filename)
+  "Returns an instance of the PACK-FILE class with parsed pack file
+information - index and offsets table, used for quick access to the
+data inside the pack file"
   (make-instance 'pack-file :pack-filename filename))
 
 
 (defmethod create-new-entry ((self pack-file) hash entry stream)
+  "Create the pack file ENTRY by parsing the information of the
+entry in the STREAM. The created entry will be added with the key HASH
+to the INDEX-TABLE slot of the pack-file SELF object."
   (with-slots (index-table offsets-table) self
     (let ((current-entry (make-instance 'pack-entry
                                         :offset (car entry)
@@ -615,6 +636,8 @@ object is known only when we parse delta object."
     
 
 (defun apply-delta (base delta)
+  "Applies the DELTA to the BASE object. DELTA is the byte-array of
+uncompressed delta data for the pack file entry stored in delta format"
   (let* ((stream (flexi-streams:make-in-memory-input-stream delta))
          (source-length (read-delta-vli stream))
          (target-length (read-delta-vli stream))
