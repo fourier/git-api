@@ -1,14 +1,16 @@
 (in-package :cl-user)
-(defpackage git-api-test
+(defpackage utils-test
   (:use :cl
-        :git-api
+        :git-api.utils
         :prove))
-(in-package :git-api-test)
+(in-package :utils-test)
 
 ;; NOTE: To run this test file, execute `(asdf:test-system :git-api)' in your Lisp.
 
 (plan nil)
 
 ;; blah blah blah.
+
+(is 1 1)
 
 (finalize)
