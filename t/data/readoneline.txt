@@ -1,0 +1,2 @@
+A test of one line reading from the file.
+The rest should not be read.

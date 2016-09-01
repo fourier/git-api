@@ -16,6 +16,7 @@
   :author "Alexey Veretennikov"
   :license "BSD"
   :depends-on (:git-api
+               :cl-fad
                :prove)
   :components ((:module "t"
                 :components
