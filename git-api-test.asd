@@ -7,20 +7,18 @@
 (defpackage git-api-test-asd
   (:use :cl :asdf))
 (in-package :git-api-test-asd)
-;; turn off ansi colors in report output
-(setf prove.color:*enable-colors* nil)
-;; change type of the reporter to Test Anything Protocol
-(setf prove:*default-reporter* :tap)
 
 (defsystem git-api-test
   :author "Alexey Veretennikov"
   :license "BSD"
   :depends-on (:git-api
                :cl-fad
+               :flexi-streams
                :prove)
   :components ((:module "t"
                 :components
-                ((:test-file "pack-test")
+                ((:file "base")
+                 (:test-file "pack-test")
                  (:test-file "utils-test"))))
   :description "Test system for git-api"
 
