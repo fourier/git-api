@@ -45,15 +45,38 @@
     (2532326 128 153 198 102))
   "Test data for read-network-vli function")
 
+(defparameter +delta-vli-tests+
+  '((356 228 2) 
+    (3374 174 26) 
+    (1014 246 7) 
+    (1553 145 12) 
+    (31895 151 249 1) 
+    (6217 201 48) 
+    (321 193 2) 
+    (20157 189 157 1) 
+    (8113 177 63) 
+    (29519 207 230 1)
+    (624 240 4) 
+    (755 243 5) 
+    (743 231 5) 
+    (360 232 2) 
+    (333 205 2) 
+    (498 242 3))
+  "Test data for read-delta-vli function")
+
 (plan nil)
 
-(subtest "Testing read-network-vli"
-  (loop for test-case in +network-vli-tests+
-        for value = (car test-case)
-        and stream = (flexi-streams:make-in-memory-input-stream (cdr test-case))
-        do
-        (is value (read-network-vli stream))))
+(defmacro stream-readers-test (description function test-data)
+  `(subtest ,description
+     (loop for test-case in ,test-data
+           for value = (car test-case)
+           and stream = (flexi-streams:make-in-memory-input-stream (cdr test-case))
+           do
+           (is value (,function stream)))))
 
+
+(stream-readers-test "Testing read-network-vli" read-network-vli +network-vli-tests+)
+(stream-readers-test "Testing read-delta-vli" read-delta-vli +delta-vli-tests+)
 
 
 (finalize)
