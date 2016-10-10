@@ -10,7 +10,8 @@
 ;;----------------------------------------------------------------------------
 @export-class
 (defclass git-object ()
-  ((hash :initarg :hash :reader object-hash :type '(vector unsigned-byte 8)))
+  ((hash :initarg :hash :reader object-hash :type '(vector unsigned-byte 8)
+         :documentation "Every git object has a SHA1-hash"))
   (:documentation "Base class for Git objects"))
 
 

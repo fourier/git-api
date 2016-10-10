@@ -5,6 +5,7 @@
 (in-package :cl-user)
 (defpackage git-api.test.pack-test
   (:use :cl
+        :git-api.test.base
         :git-api.utils
         :git-api.pack
         :prove))
@@ -14,6 +15,7 @@
 ;; import unexterned(private for package) functions
 (from git-api.pack import read-network-vli read-delta-vli)
 (from git-api.pack import read-pack-entry-header)
+(from git-api.pack import parse-index-file)
 
 (defparameter +network-vli-tests+
   '((240 128 112) 
@@ -77,6 +79,22 @@
 
 (stream-readers-test "Testing read-network-vli" read-network-vli +network-vli-tests+)
 (stream-readers-test "Testing read-delta-vli" read-delta-vli +delta-vli-tests+)
+
+
+(subtest "Testing pack-filename-to-index"
+  (fail "not implemented")
+  )
+
+(subtest "Testing index-filename-to-pack"
+  (fail "not implemented")
+  )
+
+(subtest "Testing parse-index-file"
+  (multiple-value-bind (offsets index)
+      (parse-index-file (testfile "test.idx"))
+    (isnt offsets nil)
+    (isnt index nil))
+  (fail "not implemented"))
 
 
 (finalize)

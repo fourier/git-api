@@ -209,7 +209,9 @@ The key in the hash table is a hex-string SHA1 checksum of the object;
 the value is a instance of PACK-ENTRY structure."
   (with-slots (index-table) self
     ;; first parse index file
-    (let ((index (parse-index-file self (pack-filename-to-index filename))))
+    (multiple-value-bind (offsets-table index)
+        (parse-index-file (pack-filename-to-index filename))
+      (setf (slot-value self 'offsets-table) offsets-table)
       ;; then open the pack file itself.
       ;; at this point we know offsets of entries in pack file from the index file
       (with-open-file (stream filename
@@ -392,10 +394,19 @@ little-endian format, therefore the most significant byte comes last"
 ;;----------------------------------------------------------------------------
 ;; Index file format
 ;;----------------------------------------------------------------------------
-(defmethod parse-index-file ((self pack-file) filename)
-  "Parse the pack index file. Returns an array of pairs: SHA1 hex string and offset"
+(defun parse-index-file (filename)
+  "Parse the pack index file.
+Returns VALUES (offsets-table index)
+where:
+- offsets-table is the hash-table, with:
+  key is an offset in the pack file
+  value is the array 20 bytes hash code of the object
+- index is a sorted array of pairs: (offset hash) (as the value in the offsets-table)
+Index table is used in pack files where deltas sometimes specify not the real offset or
+hash code, but rather relative offset in the pack file, so we would have to determine
+what is the hash code of the parent delta object"
   (declare (optimize (speed 3) (safety 0) (debug 0)))
-  (with-slots (offsets-table) self
+  (let (offsets-table)
     (with-open-file (stream filename :direction :input
                             :element-type '(unsigned-byte 8))
       (let ((header (make-array 4
@@ -443,8 +454,9 @@ little-endian format, therefore the most significant byte comes last"
                 (read-sequence hash stream)                  
                 (setf (aref index i) (cons offset hash)
                       (gethash offset offsets-table) hash))
-          ;; finally return the sorted array of conses (offset . hash)
-          (sort index (lambda (x y) (declare (integer x y)) (< x y)) :key (lambda (x) (the integer (car x)))))))))
+          ;; finally return the offsets-table and sorted array of conses (offset . hash)
+          (values offsets-table
+                  (sort index (lambda (x y) (declare (integer x y)) (< x y)) :key (lambda (x) (the integer (car x))))))))))
 
           
 (defun read-fanout-table (stream)

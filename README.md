@@ -1,5 +1,6 @@
+[![Build Status](https://travis-ci.org/fourier/git-api.svg?branch=master)](https://travis-ci.org/fourier/git-api)
 # Git-Api - Library for accessing git repository
-
+Work in progress!!!
 ## Usage
 
 ## Installation
