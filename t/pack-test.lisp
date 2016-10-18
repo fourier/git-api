@@ -74,7 +74,7 @@
            for value = (car test-case)
            and stream = (flexi-streams:make-in-memory-input-stream (cdr test-case))
            do
-           (is value (,function stream)))))
+           (is value (,function stream) (format nil "reading value ~a" value)))))
 
 
 (stream-readers-test "Testing read-network-vli" read-network-vli +network-vli-tests+)
@@ -90,10 +90,27 @@
   )
 
 (subtest "Testing parse-index-file"
+  ;; parse file
   (multiple-value-bind (offsets index)
       (parse-index-file (testfile "test.idx"))
-    (isnt offsets nil)
-    (isnt index nil))
+    ;; verify what return values are not empty
+    (isnt offsets nil "check returned offsets not nil")
+    (isnt index nil "check returned index not nil")
+    ;; read the index from pre-parsed data
+    (let ((saved-index
+           (with-open-file (s (testfile "test_idx.sexp") :direction :input)
+             (read s))))
+      (is index saved-index "check index read is the same as expected"
+          :test #'equalp))
+    (let ((expected-offsets (make-hash-table :test #'eq :size (length index))))
+      (loop for (x . y) across index
+            do (setf (gethash x expected-offsets) y))
+      (is offsets expected-offsets "check offsets are the same as in index array"
+          :test #'equalp))))
+
+
+(subtest "Testing read-offsets"
+  ;; read-offsets
   (fail "not implemented"))
 
 
