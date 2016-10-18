@@ -37,7 +37,6 @@
   :components ((:module "t"
                 :components
                 ((:file "base")
-                 (:file "coverage")
                  (:test-file "pack-test")
                  (:test-file "utils-test"))))
   :description "Test system for git-api"
