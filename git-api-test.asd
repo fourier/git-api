@@ -9,7 +9,7 @@
 
   In order to perform code coverage with these tests (currenty supported
   only on LispWorks 7), run the following:
-  (asdf/operate:operate 'git-api-test-asd::coverage-op :git-api-test)
+  (asdf/operate:operate 'git-api-test-asd:coverage-op :git-api-test)
 |#
 
 

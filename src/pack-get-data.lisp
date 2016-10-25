@@ -3,13 +3,13 @@
 ;; This package reads the compressed entry from the pack file
 ;;
 (defpackage #:git-api.pack.get-data
-  (:use #:cl #:cl-annot.class #:alexandria #:git-api.utils #:static-vectors))
+  (:use #:cl #:alexandria #:git-api.utils #:static-vectors)
+  (:export *try-use-temporary-output-buffer*
+   get-object-data))
 
 (in-package #:git-api.pack.get-data)
-(annot:enable-annot-syntax)
 
 
-@export
 (defparameter *try-use-temporary-output-buffer* t
   "When set to T the functions will use intermediate buffers to
 unpack and return the data to avoid excessive memory allocations.
@@ -51,7 +51,6 @@ This buffer is used with CFFI version of zlib")
   "A pointer to the uncompressed size used by CFFI zlib uncompress function")
 
 (declaim (inline dispatch))
-@export
 (defun get-object-data (offset compressed-size uncompressed-size stream)
   ;; try to guess which version to use
   (cond

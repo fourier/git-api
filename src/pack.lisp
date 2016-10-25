@@ -11,7 +11,12 @@
 ;; read the source: https://github.com/git/git/blob/master/pack-write.c
 ;;
 (defpackage #:git-api.pack
-  (:use #:cl #:cl-annot.class #:alexandria #:git-api.utils #:git-api.pack.get-data))
+  (:use #:cl #:cl-annot.class #:alexandria #:git-api.utils #:git-api.pack.get-data)
+  (:export
+   pack-open-stream
+   pack-close-stream
+   parse-pack-file
+   pack-get-object-by-hash))
 
 
 (in-package #:git-api.pack)
@@ -164,7 +169,6 @@ The hash table with the mapping between sha1 binary code and entry")
     (parse-pack-file-impl self pack-filename)))
 
 
-@export
 (defmethod pack-open-stream ((self pack-file))
   "Opens the file stream for the pack-file SELF.
 It is convenient to open stream once for all search operations in the packfile.
@@ -176,7 +180,6 @@ Don't forget to close it with corresponding call pack-close-stream"
     (setf pack-stream (open pack-filename :direction :input :element-type '(unsigned-byte 8)))))
 
 
-@export
 (defmethod pack-close-stream ((self pack-file))
   "Closes the file stream for the pack-file SELF.
 The stream is previously opened with pack-close-stream"
@@ -501,7 +504,10 @@ less or equal to 256, as the byte <= 256"
               (setf (aref offsets (ash i -2)) (ub32ref/be table i))))
     ;; WARNING!
     ;; the code below for large (> 2gb) files in pack files
-    ;; has not been tested!!!
+    ;; does not work since the size of big files couldn't fit into
+    ;; the fixnum and therefore since all the code written with assumption
+    ;; of fixnum sizes it is fail on type checks.
+    ;; Need to introduce separate (not optimized) way to handle big files.
     ;; after processing of small offsets let's process big offsets
     (when big-offsets
       ;; read all values from the stream
@@ -517,7 +523,6 @@ less or equal to 256, as the byte <= 256"
     offsets))
 
 
-@export
 (defun parse-pack-file (filename)
   "Returns an instance of the PACK-FILE class with parsed pack file
 information - index and offsets table, used for quick access to the
@@ -565,7 +570,6 @@ to the INDEX-TABLE slot of the pack-file SELF object."
       current-entry)))
 
 
-@export
 (defmethod pack-get-object-by-hash ((self pack-file) hash)
   "Find the object in the packfile. Return the uncompressed object
 from the pack file as a vector of bytes.

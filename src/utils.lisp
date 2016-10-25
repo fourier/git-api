@@ -1,9 +1,17 @@
 ;;;; utils.lisp
 (defpackage #:git-api.utils
-  (:use #:cl #:cl-annot.class #:alexandria))
+  (:use #:cl #:alexandria)
+  (:export
+   from
+   read-one-line
+   file-size
+   read-binary-file
+   read-header
+   sha1-to-hex
+   sha1-hex-to-array
+   make-array-view))
 
 (in-package #:git-api.utils)
-(annot:enable-annot-syntax)
 
 ;;----------------------------------------------------------------------------
 ;; Constants
@@ -16,7 +24,6 @@
 ;;----------------------------------------------------------------------------
 ;; Utility macros
 ;;----------------------------------------------------------------------------
-@export
 (defmacro from (package import name &rest others)
   "Import symbol(s) NAME ... from the package PACKAGE.
 Examples:
@@ -44,7 +51,6 @@ In the last example imports all the exported symbols from the package given."
                  symbols)))))
 
 
-@export
 (defmacro read-one-line (filename)
   "Read exactly one first line from the file"
   (let ((stream-var (gensym)))
@@ -55,14 +61,12 @@ In the last example imports all the exported symbols from the package given."
 ;;----------------------------------------------------------------------------
 ;; Utility functions
 ;;----------------------------------------------------------------------------
-@export
 (defun file-size (filename)
   "Return the size of the file with the name FILENAME in bytes"
   (with-open-file (in filename :element-type '(unsigned-byte 8))
     (file-length in)))
 
 
-@export
 (defun read-binary-file (filename)
   "Return an array of file contents"
   (with-open-file (stream filename :direction :input :element-type '(unsigned-byte 8))
@@ -74,7 +78,6 @@ In the last example imports all the exported symbols from the package given."
       buffer)))
 
 
-@export
 (defun read-header (filename size)
   "Read SIZE bytes from the file FILENAME. If the file size is less than SIZE,
 read up to the size of file"
@@ -86,7 +89,6 @@ read up to the size of file"
         buffer))))
             
 
-@export
 (defun sha1-to-hex (input &optional (offset 0))
   "Reads the SHA1 code from either:
 - stream,
@@ -157,7 +159,6 @@ NOTE: OFFSET is ignored for streams"
     hex))
 
 
-@export
 (defun sha1-hex-to-array (sha1string &optional result)
   "Convert the given sha1 string in hex (with lower case characters)
 to the byte array.
@@ -182,7 +183,6 @@ If RESULT array is given - write to this array"
         (setf (aref result x) (the fixnum (+ (the fixnum (ash upper-val 4)) lower-val))))))
   result)
 
-@export  
 (defun make-array-view (vector start end)
   "Returns array displaced to the vector (starting with start, ending on end)"
   (make-array (- end start 1)
