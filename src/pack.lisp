@@ -20,7 +20,6 @@
 
 
 (in-package #:git-api.pack)
-(annot:enable-annot-syntax)
 
 ;; imports
 (from nibbles import read-ub32/be ub32ref/be read-ub64/be)
@@ -69,15 +68,18 @@
 ;;----------------------------------------------------------------------------
 ;; Conditions
 ;;----------------------------------------------------------------------------
-(define-condition corrupted-pack-file-error (error)
-  ((text :initarg :text :reader text)))
+(define-condition pack-error (error)
+  ((text :initarg :text))
+  (:report (lambda (condition stream)
+             (format stream "Pack file error: ~a" (slot-value condition 'text)))))
 
-(define-condition corrupted-index-file-error (error)
-  ((text :initarg :text :reader text)))
+(define-condition corrupted-pack-file-error (pack-error) nil)
+
+(define-condition corrupted-index-file-error (pack-error) nil)
+
+(define-condition incorrect-file-name-error (pack-error) nil)
 
 
-
-@export-class
 (defclass pack-entry  ()
   ((offset :initarg :offset :initform nil :type fixnum
            :accessor pack-entry-offset
@@ -146,7 +148,6 @@ TYPE SIZE SIZE-IN-PACKFILE OFFSET-IN-PACKFILE"
             (sha1-to-hex (pack-entry-base-hash entry)))))
 
 
-@export-class
 (defclass pack-file ()
   ((pack-filename :initarg :pack-filename :initform nil :reader pack-filename
                   :type string
@@ -193,7 +194,10 @@ The stream is previously opened with pack-close-stream"
   "Convert pack file name to index file name (by replacing extension)"
   (multiple-value-bind (pos end)
       (ppcre:scan "(?i).pack$" filename)
-    (assert (= (- end pos) 5))
+    (when (or (null pos)
+              (/= (- end pos) 5))
+      (error 'incorrect-file-name-error :text
+             (format nil "Incorrect pack file name ~a" filename)))
     (concatenate 'string (subseq filename 0 pos) ".idx")))
 
 
@@ -201,7 +205,10 @@ The stream is previously opened with pack-close-stream"
   "Convert index file name to pack file name (by replacing extension)"
   (multiple-value-bind (pos end)
       (ppcre:scan "(?i).idx$" filename)
-    (assert (= (- end pos) 4))
+    (when (or (null pos)
+              (/= (- end pos) 4))
+      (error 'incorrect-file-name-error :text
+             (format nil "Incorrect index file name ~a" filename)))
     (concatenate 'string (subseq filename 0 pos) ".pack")))
 
 

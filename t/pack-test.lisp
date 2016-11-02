@@ -16,6 +16,11 @@
 (from git-api.pack import read-network-vli read-delta-vli)
 (from git-api.pack import read-pack-entry-header)
 (from git-api.pack import parse-index-file)
+(from git-api.pack import
+      pack-filename-to-index
+      index-filename-to-pack
+      incorrect-file-name-error
+      corrupted-index-file-error)
 
 (defparameter +network-vli-tests+
   '((240 128 112) 
@@ -82,14 +87,39 @@
 
 
 (subtest "Testing pack-filename-to-index"
-  (fail "not implemented")
-  )
+  (let ((pack1 "//some/weird-filename1.pack")
+        (pack2 "//some/weird filename2.PACK")
+        (pack3 "weird filename3.PackK")
+        (pack4 "completely weird filename"))
+    (is (pack-filename-to-index pack1) "//some/weird-filename1.idx" :test #'string=
+        "normal case")
+    (is (pack-filename-to-index pack2) "//some/weird filename2.idx" :test #'string=
+        "upper-case extension")
+    (is-error (pack-filename-to-index pack3) 'incorrect-file-name-error
+        "too long extension")
+    (is-error (pack-filename-to-index pack4) 'incorrect-file-name-error
+        "completely weird filename")))
 
 (subtest "Testing index-filename-to-pack"
-  (fail "not implemented")
-  )
+  (let ((idx1 "//some/weird-filename1.idx")
+        (idx2 "//some/weird filename2.IDX")
+        (idx3 "weird filename3.iDXX")
+        (idx4 "completely weird filename"))
+    (is (index-filename-to-pack idx1) "//some/weird-filename1.pack" :test #'string=
+        "normal case")
+    (is (index-filename-to-pack idx2) "//some/weird filename2.pack" :test #'string=
+        "upper-case extension")
+    (is-error (index-filename-to-pack idx3) 'incorrect-file-name-error
+        "too long extension")
+    (is-error (index-filename-to-pack idx4) 'incorrect-file-name-error
+        "completely weird filename")
+    (is idx1 (pack-filename-to-index (index-filename-to-pack idx1)) :test #'string=
+        "conversion from index to pack and back")))
 
 (subtest "Testing parse-index-file"
+  ;; catch the error condition
+  (is-error (parse-index-file (testfile "binary.dat")) 'corrupted-index-file-error
+            "Test raised condition on corrupted file")
   ;; parse file
   (multiple-value-bind (offsets index)
       (parse-index-file (testfile "test.idx"))

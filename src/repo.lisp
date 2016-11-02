@@ -1,4 +1,10 @@
 ;;;; repo.lisp
+;;
+;; Usage (test) example:
+;; (setf *repo* (git-api.repo:make-git-repo "~/Sources/lisp/git-api"))
+;; (git-api.repo::get-commit-tree *repo* (git-api.repo:get-head-commit *repo*))
+;;
+
 (defpackage #:git-api.repo
   (:use #:cl #:cl-annot.class #:alexandria
    #:git-api.utils #:git-api.pack #:git-api.object))
