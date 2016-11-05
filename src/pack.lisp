@@ -11,7 +11,7 @@
 ;; read the source: https://github.com/git/git/blob/master/pack-write.c
 ;;
 (defpackage #:git-api.pack
-  (:use #:cl #:cl-annot.class #:alexandria #:git-api.utils #:git-api.pack.get-data)
+  (:use #:cl #:alexandria #:git-api.utils #:git-api.pack.get-data)
   (:export
    pack-open-stream
    pack-close-stream
@@ -489,8 +489,21 @@ less or equal to 256, as the byte <= 256"
           
     
 (defun read-offsets (stream size)
-  "Read offset table[s] and return the array of offsets in PACK file"
+  "Read offset table[s] and return the array of offsets in PACK file.
+STREAM is the stream to read from with the current position is
+the beginning of the offsets table.
+SIZE is the size of offsets table."
   (declare (optimize (speed 3) (safety 0) (debug 0)))
+  ;; From the documentation:
+  ;; 'A table of 4-byte offset values (in network byte order).
+  ;;     These are usually 31-bit pack file offsets, but large
+  ;;     offsets are encoded as an index into the next table with
+  ;;     the msbit set.'
+  ;; The next table for big files:
+  ;; 'A table of 8-byte offset entries (empty for pack files less
+  ;;     than 2 GiB).  Pack files are organized with heavily used
+  ;;     objects toward the front, so most object references should
+  ;;     not need to refer to this table.'
   (let* ((offsets (make-array size :element-type 'fixnum :adjustable nil))
          (big-offsets nil)
          (bytes-size (* size 4))
@@ -501,7 +514,7 @@ less or equal to 256, as the byte <= 256"
           ;; processing separately depending if the MSB is set on the first
           ;; byte of encoded length
           (if (>= (the fixnum (aref table i)) 128)
-              ;; if set we clear the msb 
+              ;; large files: if set we clear the msb 
               (progn
                 (setf (aref table i) (logand 127 (aref table i)))
                 ;; and push to the list of "big offsets" as a pair:

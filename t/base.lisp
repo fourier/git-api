@@ -5,7 +5,8 @@
 (defpackage git-api.test.base
   (:use :cl
         :prove)
-  (:export testfile))
+  (:export testfile random-shuffle random-shufflef))
+   
    
 (in-package :git-api.test.base)
 
@@ -18,3 +19,36 @@
 
 (defun testfile (filename)
   (merge-pathnames *test-data-path* filename))
+
+
+(defmethod random-shufflef ((container list))
+  (let ((n (length container)))
+    (loop for i from (- n 1) downto 0
+          do 
+          (rotatef (nth i container) (nth (random (+ i 1)) container)))
+    container))
+
+
+(defmethod random-shufflef ((container array))
+  (let ((n (length container)))
+    (loop for i from (- n 1) downto 0
+          do 
+          (rotatef (aref container i) (aref container (random (+ i 1)))))
+    container))
+
+(defmethod random-shuffle ((container list))
+  (let ((result (copy-list container))
+        (n (length container)))
+    (loop for i from (- n 1) downto 0
+          do 
+          (rotatef (nth i result) (nth (random (+ i 1)) result)))
+    result))
+
+
+(defmethod random-shuffle ((container array))
+  (let ((result (copy-seq container))
+        (n (length container)))
+    (loop for i from (- n 1) downto 0
+          do 
+          (rotatef (aref result i) (aref result (random (+ i 1)))))
+    result))
