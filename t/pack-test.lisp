@@ -23,7 +23,7 @@
       index-filename-to-pack
       incorrect-file-name-error
       corrupted-index-file-error)
-(from git-api.pack import read-offsets)
+(from git-api.pack import read-offsets read-fanout-table)
 
 (defparameter +network-vli-tests+
   '((240 128 112) 
@@ -142,6 +142,20 @@
           :test #'equalp))))
 
 
+(subtest "Testing read-fanout-table"
+  ;; prepare the test data
+  (let* ((fanout-table ; the array with encoded 256 numbers
+          (make-array 256 :initial-contents
+                      (loop for i from 0 below 256 collect (random (ash 2 30)))))
+         (encoded-array
+          (flexi-streams:with-output-to-sequence (stream) ; encode to in-memory stream 
+            (loop for x across fanout-table
+                  do (write-ub32/be x stream)))))
+    ;; now reopen the test data as a stream
+    (flexi-streams:with-input-from-sequence (stream encoded-array)
+      (is (read-fanout-table stream) fanout-table "check random 256 values in fanout table"
+          :test #'equalp))))
+
 
 (defun create-small-random-offsets (size)
   (make-array size :initial-contents
@@ -166,17 +180,18 @@
             "check simple table with values < 2^31"
             :test #'equalp)))
     ;; test of small offsets + big offsets
+;;    (let ((order (random-shuffle (iota (+ size-smalls size-bigs)))
     (skip 1 "TODO: reimplement large offsets handling and enable this test")
-    ;;;     (let ((order (random-shuffle (iota (+ size-smalls size-bigs)))
-;;;     (let ((table 
-;;;            (flexi-streams:with-output-to-sequence (stream)
-;;;              (loop for x across table-small do (write-ub32/be x stream))
-;;;              (loop for i below size-bigs do (write (logior (ash 1 31) i)))
-;;;              (loop for x across table-big do (write-ub64/be x stream)))))
-;;;       (flexi-streams:with-input-from-sequence (stream table)
-;;;         (is (read-offsets stream (+ size-smalls size-bigs)) table-small :test #'equalp)))))
-;;;                      
-))
+    #|
+    (let ((table 
+           (flexi-streams:with-output-to-sequence (stream)
+             (loop for x across table-small do (write-ub32/be x stream))
+             (loop for i below size-bigs do (write (logior (ash 1 31) i)))
+             (loop for x across table-big do (write-ub64/be x stream)))))
+      (flexi-streams:with-input-from-sequence (stream table)
+        (is (read-offsets stream (+ size-smalls size-bigs)) table-small :test #'equalp)))))
+    |#
+    ))
 
 
 (finalize)
