@@ -33,6 +33,7 @@
   :depends-on (:git-api
                :cl-fad
                :flexi-streams
+               :nibbles
                :prove)
   :components ((:module "t"
                 :components

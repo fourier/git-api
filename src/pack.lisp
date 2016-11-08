@@ -726,13 +726,15 @@ Returns values: (new position, offset, size) to copy"
   ;; The MSB of copy command is set to 1.
   ;; Therefore remaining 7 bits should contain necessary information
   ;; in compressed format:
-  ;; - middle 3 bits are the compressed offset
-  ;; - last 4 bits are the compressed amount of bytes to copy.
+  ;; - middle 3 bits are the compressed size
+  ;; - last 4 bits are the compressed offset
   ;; Compression implemented in the following way:
   ;; amount of bytes to follow is the number of bits set to 1s,
   ;; the bits set to 0 indicate the skipped byte with zeros only.
   ;; for example 1001 mean byte1,00000000,00000000,byte2
   ;; This integer is in the little-endian format.
+  ;; The bytes follows: first are the offset bytes
+  ;; next are the size bytes
   (let* ((current-byte (aref delta pos))
          (offset (logand 15 current-byte))
          (len (ash (logand 112 current-byte) -4))

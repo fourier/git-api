@@ -199,24 +199,19 @@
 
 
 (subtest "Testing decode-delta-copy-cmd"
-  (let ((offset-bytes #(#x00 #xaa #x00 #x00))
-        (size-bytes #(#xcc #xdd #x00 #x00))
-        (offset-encoded-bits #b010)
-        (size-encoded-bits #b1100)
-        ;; the data itself
-        (data (vector (logior #x80 (ash #b010 4) #b1100)
-                      #xaa #xcc #xdd #x00 #x00 #x00)))
-                      ;#xaa #xbb #xcc #xdd #xee #xff)))
-                      
+  (let* ((size-bytes #(#x00 #xaa #x00 #x00))
+         (offset-bytes #(#x00 #x00 #xcc #xdd))
+         (size-encoded-bits #b010)
+         (offset-encoded-bits #b1100)
+         ;; the data itself
+         (data (vector (logior #x80 (ash size-encoded-bits 4) offset-encoded-bits)
+                       #xcc #xdd ; first parts of offset
+                       #xaa)))   ; and then parts of size
     (multiple-value-bind (new-pos offset size)
         (decode-delta-copy-cmd data 0)
-      (format t "offset ~x~%" (nibbles:ub32ref/le offset-bytes 0))
-      (format t "size ~x~%" (nibbles:ub32ref/le size-bytes 0))
-      (format t "offset ~x~%" offset)
-      (format t "size ~x~%" size)
       (is new-pos 3 "Check if new position is 3")
-      (is offset (nibbles:ub32ref/le offset-bytes 0))
-      (is size (nibbles:ub32ref/be size-bytes 0)))))
+      (is offset (nibbles:ub32ref/le offset-bytes 0) "check if decoded offset is correct")
+      (is size (nibbles:ub32ref/le size-bytes 0) "check if decoded size is correct"))))
 
 
 (subtest "Testing apply-delta"
