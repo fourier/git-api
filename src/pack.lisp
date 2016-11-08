@@ -720,6 +720,19 @@ uncompressed delta data for the pack file entry stored in delta format"
 The POS is the current position on the DELTA array.
 Returns values: (new position, offset, size) to copy"
   ;; tested against patch-delta.c from git
+  ;; The format of the copy command is the following:
+  ;; 2 things we have to decode: offset in the original data
+  ;; and the amount of bytes to copy
+  ;; The MSB of copy command is set to 1.
+  ;; Therefore remaining 7 bits should contain necessary information
+  ;; in compressed format:
+  ;; - middle 3 bits are the compressed offset
+  ;; - last 4 bits are the compressed amount of bytes to copy.
+  ;; Compression implemented in the following way:
+  ;; amount of bytes to follow is the number of bits set to 1s,
+  ;; the bits set to 0 indicate the skipped byte with zeros only.
+  ;; for example 1001 mean byte1,00000000,00000000,byte2
+  ;; This integer is in the little-endian format.
   (let* ((current-byte (aref delta pos))
          (offset (logand 15 current-byte))
          (len (ash (logand 112 current-byte) -4))
