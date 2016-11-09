@@ -22,7 +22,8 @@
       pack-filename-to-index
       index-filename-to-pack
       incorrect-file-name-error
-      corrupted-index-file-error)
+      corrupted-index-file-error
+      corrupted-pack-file-error)
 (from git-api.pack import read-offsets read-fanout-table)
 ;; deltas
 (from git-api.pack import decode-delta-copy-cmd apply-delta)
@@ -75,6 +76,40 @@
     (333 205 2) 
     (498 242 3))
   "Test data for read-delta-vli function")
+
+(defparameter +delta-result-value+
+  #(116 114 101 101 32 56 101 101 55 52 53 49 51 55 99 53 49 57 51 56 49 57 52 56 55 48 100 57
+        48 50 99 100 55 52 102 57 98 99 48 98 101 54 49 56 102 10 97 117 116 104 111 114 32 65
+        108 101 120 101 121 32 86 101 114 101 116 101 110 110 105 107 111 118 32 60 97 108 101
+        120 101 121 46 118 101 114 101 116 101 110 110 105 107 111 118 64 103 109 97 105 108 46
+        99 111 109 62 32 49 52 55 56 55 50 48 48 51 52 32 43 48 49 48 48 10 99 111 109 109 105
+        116 116 101 114 32 65 108 101 120 101 121 32 86 101 114 101 116 101 110 110 105 107 111
+        118 32 60 97 108 101 120 101 121 46 118 101 114 101 116 101 110 110 105 107 111 118 64
+        103 109 97 105 108 46 99 111 109 62 32 49 52 55 56 55 50 48 48 51 52 32 43 48 49 48 48
+        10 10 73 110 105 116 105 97 108 32 105 109 112 111 114 116 10)
+  "Test data for apply-delta test function: the expected result (initial commit since delta
+applies from the current towards the oldest value")
+
+(defparameter +delta-delta-value+
+  #(135 2 217 1 45 116 114 101 101 32 56 101 101 55 52 53 49 51 55 99 53 49 57 51 56 49 57 52 56
+        55 48 100 57 48 50 99 100 55 52 102 57 98 99 48 98 101 54 49 56 102 145 93 67 3 48 51 52
+        145 163 76 26 48 51 52 32 43 48 49 48 48 10 10 73 110 105 116 105 97 108 32 105 109 112
+        111 114 116 10)
+  "Test data for apply-delta test function: the delta itself")
+
+(defparameter +delta-base-value+
+  #(116 114 101 101 32 57 54 48 53 55 102 48 97 54 55 102 55 97 100 48 100 51 51 52 56 50 48 54
+        56 57 52 49 48 102 100 54 53 97 50 53 101 52 55 99 52 10 112 97 114 101 110 116 32 48 101
+        99 51 51 51 55 101 101 100 101 51 97 54 52 97 97 101 100 53 48 102 55 51 55 97 100 102 49
+        54 51 101 57 102 56 100 57 50 100 99 10 97 117 116 104 111 114 32 65 108 101 120 101 121
+        32 86 101 114 101 116 101 110 110 105 107 111 118 32 60 97 108 101 120 101 121 46 118 101
+        114 101 116 101 110 110 105 107 111 118 64 103 109 97 105 108 46 99 111 109 62 32 49 52 55
+        56 55 50 48 49 50 50 32 43 48 49 48 48 10 99 111 109 109 105 116 116 101 114 32 65 108 101
+        120 101 121 32 86 101 114 101 116 101 110 110 105 107 111 118 32 60 97 108 101 120 101 121
+        46 118 101 114 101 116 101 110 110 105 107 111 118 64 103 109 97 105 108 46 99 111 109 62
+        32 49 52 55 56 55 50 48 49 50 50 32 43 48 49 48 48 10 10 67 104 97 110 103 101 100 32 116
+        101 120 116 10)
+  "Test data for apply-delta test function: the base value (most recent commit)")
 
 (plan nil)
 
@@ -215,6 +250,16 @@
 
 
 (subtest "Testing apply-delta"
-  (fail "Not implemented"))
+  (is-error (apply-delta #(1 2 3 4 5) +delta-delta-value+)
+            'corrupted-pack-file-error
+            "Test what apply-delta raise an error when the base of incorrect size provided")
+  (is-error (apply-delta +delta-base-value+ (concatenate 'vector (subseq +delta-delta-value+ 0 4) #(0 0 0 0 0 0)))
+            'corrupted-pack-file-error
+            "Test what apply-delta raise an error when incorrect delta-command(0) encountered")
+  (is 
+   (apply-delta +delta-base-value+ +delta-delta-value+)
+   +delta-result-value+
+   "Test of commit deltas"
+   :test #'equalp))
 
 (finalize)

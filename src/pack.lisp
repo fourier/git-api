@@ -710,7 +710,7 @@ uncompressed delta data for the pack file entry stored in delta format"
                               :start2 pos :end2 (+ pos current-byte))
                      (incf pos current-byte)
                      (incf dest-pos current-byte)))
-                  (t (error "Unexpected delta command 0")))))
+                  (t (error 'corrupted-pack-file-error :text "Unexpected delta command 0")))))
     result))
 
 
