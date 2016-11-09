@@ -234,8 +234,8 @@ applies from the current towards the oldest value")
 
 
 (subtest "Testing decode-delta-copy-cmd"
-  (let* ((size-bytes #(#x00 #xaa #x00 #x00))
-         (offset-bytes #(#x00 #x00 #xcc #xdd))
+  (let* ((size-bytes (make-array 4 :element-type '(unsigned-byte 8) :initial-contents '(#x00 #xaa #x00 #x00)))
+         (offset-bytes (make-array 4 :element-type '(unsigned-byte 8) :initial-contents '( #x00 #x00 #xcc #xdd)))
          (size-encoded-bits #b010)
          (offset-encoded-bits #b1100)
          ;; the data itself
