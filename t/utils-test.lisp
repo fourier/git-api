@@ -10,6 +10,7 @@
         :prove))
 (in-package :git-api.test.utils-test)
 
+(from git-api.utils import digit-to-hex)
 
 (defparameter *binary-file-contents* #(11 254 217 187 174 147 78 237 39 142 185 14 115 180 215 10 231 38 250 27 196 134 119 20 161 85 86 185 24 28 103 110 142 20 59 126 103 36 48 203 95 24 76 22 26 247 254 150 174 87 83 131 0 164 115 135 231 240 39 250 114 24 242 237 209 84 131 200 201 3 126 212)
   "Contents of the binary.dat")
@@ -87,8 +88,12 @@
         :test #'equalp
       "Hex string to array test 4 - check if result array is hte same as expected result")))
 
-      
-  
+
+(subtest "Test digit-to-hex macro"
+  (is (digit-to-hex 1) #\1 "Test (digit-to-hex 1) is '1'")
+  (is (digit-to-hex 9) #\9 "Test (digit-to-hex 9) is '9'")
+  (is (digit-to-hex 11) #\b "Test (digit-to-hex 11) is 'b'")
+  (is (digit-to-hex 15) #\f "Test (digit-to-hex 15) is 'f'"))
   
 
 (finalize)
