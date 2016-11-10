@@ -35,8 +35,10 @@ in .git/objects are containing objects (not a packfiles or info)")
 ;;----------------------------------------------------------------------------
 @export-class
 (defclass git-repo ()
-  ((path :initarg :path :reader repo-path
+  ((path :initarg :path :reader git-repo-path
          :documentation "Path to the repository")
+   (git-prefix :initform ".git/" 
+               :documentation "Prefix for the repository files - either .git or \"\" if bare repo")
    (object-files :reader object-files :initform (make-hash-table :test #'equal)
                  :documentation "A hash table with the SHA1 hex as a key and filename as a value for all unpacked objects in .git/objects directory")
    (pack-files :reader pack-files :initform nil
@@ -49,17 +51,19 @@ in .git/objects are containing objects (not a packfiles or info)")
             :documentation "A cache of commit objects to avoid double-reading"))
   (:documentation "Class representing git repository"))
 
-(defmacro repo-file (str)
-  `(concatenate 'string (slot-value self 'path) ".git/" ,str))
 
 @export
 (defun make-git-repo (path)
   (make-instance 'git-repo :path path))
 
 
+(defmethod repo-path ((self git-repo) str)
+  (concatenate 'string (slot-value self 'path) (slot-value self 'git-prefix) str))
+
+
 (defmethod initialize-instance :after ((self git-repo) &key &allow-other-keys)
   "Constructor for the git-repo class"
-  (with-slots (path pack-files packed-refs annotated-tags object-files) self
+  (with-slots (path pack-files packed-refs annotated-tags object-files git-prefix) self
     ;; append trailing "/"
     (unless (ends-with "/" path)
       (setf path (concatenate 'string path "/")))
@@ -67,16 +71,16 @@ in .git/objects are containing objects (not a packfiles or info)")
     (unless (fad:file-exists-p path)
       (error 'not-existing-repository-error
              :text (format nil "Path ~a doesn't exist" path)))
+    ;; check if path .git exist, otherwise assume bare repository
     (unless (fad:file-exists-p (concatenate 'string path ".git"))
-      (error 'not-existing-repository-error
-             :text (format nil "No .git found in ~a" path)))
+      (setf git-prefix ""))
     (unless (every #'fad:file-exists-p
-                   (mapcar (curry #'concatenate 'string path)
-                           '(".git/HEAD" ".git/objects" ".git/config" ".git/refs")))
+                   (mapcar (curry #'repo-path self)
+                           '("objects" "refs/heads" "refs/tags")))
       (error 'corrupted-repository-error
              :text (format nil "Repository in ~a has a corrupted structure" path)))
     ;; collect all pack files
-    (let ((files (directory (repo-file "objects/pack/*.pack"))))
+    (let ((files (directory (repo-path self "objects/pack/*.pack"))))
       (mapcar (lambda (pack)
                 (push (parse-pack-file (namestring pack)) pack-files))
               files))
@@ -84,7 +88,7 @@ in .git/objects are containing objects (not a packfiles or info)")
     (dolist (pack pack-files)
       (pack-open-stream pack))
     ;; read all refs from the packed-refs
-    (let ((packed-refs-filename (repo-file "packed-refs")))
+    (let ((packed-refs-filename (repo-path self "packed-refs")))
       (when (fad:file-exists-p packed-refs-filename)
         (with-open-file (stream packed-refs-filename
                                 :direction :input)
@@ -112,7 +116,7 @@ in .git/objects are containing objects (not a packfiles or info)")
            (remove-if-not
             (curry #'ppcre:scan +git-objects-dir-regexp+)
             (mapcar #'namestring
-                    (fad:list-directory (repo-file "objects/"))))))
+                    (fad:list-directory (repo-path self "objects/"))))))
       (loop for dir in object-dirs
             do
             (loop for fil in (mapcar #'namestring (fad:list-directory dir))
@@ -136,7 +140,7 @@ in .git/objects are containing objects (not a packfiles or info)")
 
 
 @export
-(defmethod get-object-by-hash ((self git-repo) hash &key result-block)
+(defmethod get-object-by-hash ((self git-repo) hash)
   "Returns the object by the given hash string"
   ;; first try if the file exists
   (with-slots (path pack-files object-files) self
@@ -171,7 +175,7 @@ in .git/objects are containing objects (not a packfiles or info)")
 
 @export
 (defmethod get-head-hash ((self git-repo))
-  (let* ((head-file (repo-file "HEAD"))
+  (let* ((head-file (repo-path self "HEAD"))
          (head-contents (read-one-line head-file)))
     ;; check if the HEAD points to the detached commit
     (if (not (starts-with-subseq "ref: " head-contents))
@@ -187,7 +191,7 @@ Examples of ref strings:
 ref/heads/master
 refs/tags/v1.0"
   (with-slots (packed-refs) self
-    (let ((ref-file (repo-file ref)))
+    (let ((ref-file (repo-path self ref)))
       ;; check if the ref is a normal file
       (if (fad:file-exists-p ref-file)
           (read-one-line ref-file)

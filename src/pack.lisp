@@ -1,4 +1,4 @@
- ;;;; pack.lisp
+;;;; pack.lisp
 ;;
 ;; This package reads the git pack and index files
 ;; according to the official documentation:
@@ -45,17 +45,17 @@
 ;; Constants from https://github.com/git/git/blob/master/cache.h
 ;;----------------------------------------------------------------------------
 
-(defconstant OBJ-BAD -1)
-(defconstant OBJ-NONE 0)
-(defconstant OBJ-COMMIT 1)
-(defconstant OBJ-TREE 2)
-(defconstant OBJ-BLOB 3)
-(defconstant OBJ-TAG 4)
+(defconstant +obj-bad+ -1)
+(defconstant +obj-none+ 0)
+(defconstant +obj-commit+ 1)
+(defconstant +obj-tree+ 2)
+(defconstant +obj-blob+ 3)
+(defconstant +obj-tag+ 4)
 ;; 5 for future expansion 
-(defconstant OBJ-OFS-DELTA 6)
-(defconstant OBJ-REF-DELTA 7)
-(defconstant OBJ-ANY 8)
-(defconstant OBJ-MAX 9)
+(defconstant +obj-ofs-delta+ 6)
+(defconstant +obj-ref-delta+ 7)
+(defconstant +obj-any+ 8)
+(defconstant +obj-max+ 9)
 
 ;;----------------------------------------------------------------------------
 ;; Globals
@@ -80,6 +80,9 @@
 (define-condition incorrect-file-name-error (pack-error) nil)
 
 
+;;----------------------------------------------------------------------------
+;; pack-entry class
+;;----------------------------------------------------------------------------
 (defclass pack-entry  ()
   ((offset :initarg :offset :initform nil :type fixnum
            :accessor pack-entry-offset
@@ -113,10 +116,10 @@ keyword, unless the entry type is delta, in this case the VALUE
 will remain as is"
   (setf (slot-value entry 'type) value)
   (switch (value)
-    (OBJ-COMMIT (setf (slot-value entry 'type) :commit))
-    (OBJ-TAG (setf (slot-value entry 'type) :tag))
-    (OBJ-TREE (setf (slot-value entry 'type) :tree))
-    (OBJ-BLOB (setf (slot-value entry 'type) :blob)))
+    (+obj-commit+ (setf (slot-value entry 'type) :commit))
+    (+obj-tag+ (setf (slot-value entry 'type) :tag))
+    (+obj-tree+ (setf (slot-value entry 'type) :tree))
+    (+obj-blob+ (setf (slot-value entry 'type) :blob)))
   (slot-value entry 'type))
 
 
@@ -134,6 +137,9 @@ TYPE SIZE SIZE-IN-PACKFILE OFFSET-IN-PACKFILE"
           (pack-entry-offset entry)))
 
 
+;;----------------------------------------------------------------------------
+;; pack-entry-delta class
+;;----------------------------------------------------------------------------
 (defclass pack-entry-delta (pack-entry)
   ((base-hash :initarg :base-hash :initform nil
               :accessor pack-entry-base-hash
@@ -147,7 +153,9 @@ TYPE SIZE SIZE-IN-PACKFILE OFFSET-IN-PACKFILE"
     (format stream " ~a"
             (sha1-to-hex (pack-entry-base-hash entry)))))
 
-
+;;----------------------------------------------------------------------------
+;; pack-file class
+;;----------------------------------------------------------------------------
 (defclass pack-file ()
   ((pack-filename :initarg :pack-filename :initform nil :reader pack-filename
                   :type string
@@ -281,9 +289,9 @@ Returns the following VALUES list (use multiple-value-bind etc.):
 where:
 TYPE is type field of values OBJ-.. (see constants above)
 LEN is the length of the uncompressed data
-BASE-HASH if the type is OBJ-REF-DELTA the hash value of the base
+BASE-HASH if the type is +obj-ref-delta+ the hash value of the base
 object for the current object (which is delta). Base hash is a hex string.
-BASE-OFFSET if the type is OBJ-OFS-DELTA the relative offset in the file
+BASE-OFFSET if the type is +obj-ofs-delta+ the relative offset in the file
 to the base object.
 
 Pack entry header format (from the official documentation
@@ -341,12 +349,12 @@ And finally the length is 6144 + 1733 = 7833"
           (setf head (the fixnum (read-byte stream)))
           (incf len (the fixnum (ash (the fixnum (logand 127 head)) shift)))
           (incf shift 7))
-    ;; check if type is OBJ-REF-DELTA or OBJ-OFS-DELTA
+    ;; check if type is +obj-ref-delta+ or +obj-ofs-delta+
     (switch (type)
-      (OBJ-REF-DELTA
+      (+obj-ref-delta+
        ;; just read the base hash
        (read-sequence base-hash stream))
-      (OBJ-OFS-DELTA
+      (+obj-ofs-delta+
        ;; read the variable-length integer
        (setf base-offset (the fixnum (read-network-vli stream)))))
     (values type len base-hash base-offset)))
@@ -574,8 +582,8 @@ to the INDEX-TABLE slot of the pack-file SELF object."
               (pack-entry-compressed-size current-entry)
               (- (cdr entry) (- (pack-entry-data-offset current-entry) (car entry))))
         ;; handle entries with deltas
-        (when (or (= type OBJ-REF-DELTA)
-                  (= type OBJ-OFS-DELTA))
+        (when (or (= type +obj-ref-delta+)
+                  (= type +obj-ofs-delta+))
           ;; convert to the ref-delta class
           (change-class current-entry 'pack-entry-delta)
           ;; set the parent hash

@@ -113,6 +113,13 @@ applies from the current towards the oldest value")
 
 (plan nil)
 
+
+
+(subtest "Test conditions"
+  (let ((general-condition
+         (make-condition 'git-api.pack::pack-error :text "general pack error")))
+    (ok (starts-with-subseq "Pack file error:" (format nil "~A" general-condition)))))
+
 (defmacro stream-readers-test (description function test-data)
   `(subtest ,description
      (loop for test-case in ,test-data
