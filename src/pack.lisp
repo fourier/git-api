@@ -251,20 +251,19 @@ the value is a instance of PACK-ENTRY structure."
               ;; finally create the hash table with the mapping between
               ;; sha1 binary code and entry 
               (setf index-table
-                    (create-pack-entries-table-initial index stream)))))))))
+                    (create-pack-entries-table-initial index (file-length stream))))))))))
 
 
-(defun create-pack-entries-table-initial (index stream)
+(defun create-pack-entries-table-initial (index file-length)
   "Create the hash table with the key as sha1 and the value is a cons:
 (offset . compressed-size),  offset in the pack file and compressed
 size(including header).
 INDEX is a sorted list of pairs (sha1 . offset)"
   (declare (optimize (speed 3) (safety 0) (debug 0)))
   (declare (type integer offset compressed-size i file-length))
-  (let ((table (make-hash-table :test #'equalp :size (length index)))
-        (file-length (file-length stream)))
     ;; fill the table.
-    (loop for i from 0 below (length index)
+    (loop with table = (make-hash-table :test #'equalp :size (length index))
+          for i from 0 below (length index)
           for offset = (car (aref index i))
           ;; calculate the compressed size (size in pack file).
           ;; This size includes the header size as well
@@ -278,8 +277,9 @@ INDEX is a sorted list of pairs (sha1 . offset)"
              offset)
           do
           (setf (gethash (cdr (aref index i)) table)
-                (cons offset compressed-size)))
-    table))
+                (cons offset compressed-size))
+          finally (return table)))
+
                                   
 
 (defun read-pack-entry-header (stream)

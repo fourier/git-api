@@ -269,4 +269,9 @@ applies from the current towards the oldest value")
    "Test of commit deltas"
    :test #'equalp))
 
+
+(subtest "Test of reate-pack-entries-table-initial"
+  (fail "TODO: implement it"))
+
+
 (finalize)
