@@ -240,18 +240,22 @@ the value is a instance of PACK-ENTRY structure."
                                   :fill-pointer t)))
           (read-sequence header stream :end 4)
           ;; check header word
-          (when (and (string= (octets-to-string header) +pack-file-header-word+)
-                     ;; and version = 2
-                     (= +pack-version+ (read-ub32/be stream)))
-            (let ((objects-count (read-ub32/be stream)))
-              ;; sanity check
-              (unless (= objects-count (length index))
-                (error 'corrupted-pack-file-error :text
-                       (format nil "Corrupted pack file ~a. Number of objects ~d != index length ~d" filename objects-count (length index))))
-              ;; finally create the hash table with the mapping between
-              ;; sha1 binary code and entry 
-              (setf index-table
-                    (create-pack-entries-table-initial index (file-length stream))))))))))
+          (unless (string= (octets-to-string header) +pack-file-header-word+)
+            (error 'corrupted-pack-file-error :text
+                   (format nil "Corrupted pack file ~a. Not expected header word ~a" filename (octets-to-string header))))
+          ;; check version = 2
+          (unless (= +pack-version+ (read-ub32/be stream))
+            (error 'corrupted-pack-file-error :text
+                   (format nil "Corrupted pack file ~a. Header is corrupted - expected version 2" filename)))
+          (let ((objects-count (read-ub32/be stream)))
+            ;; sanity check
+            (unless (= objects-count (length index))
+              (error 'corrupted-pack-file-error :text
+                     (format nil "Corrupted pack file ~a. Number of objects ~d != index length ~d" filename objects-count (length index))))
+            ;; finally create the hash table with the mapping between
+            ;; sha1-binary code and entry 
+            (setf index-table
+                  (create-pack-entries-table-initial index (file-length stream)))))))))
 
 
 (defun create-pack-entries-table-initial (index file-length)
