@@ -329,4 +329,25 @@ applies from the current towards the oldest value")
           (is (gethash sha1 table) y (format nil "check ~a has (offset size) of ~a" (sha1-to-hex sha1) y)))))
 
 
+(subtest "Test of read-pack-entry-header"
+  (let ((test1 '(149 236 3)))
+    (diag (format nil "Test decoding of the bytes ~a, type 1 and size 7877" test1))
+    (flexi-streams:with-input-from-sequence (stream test1)
+      (multiple-value-bind (type len base-hash base-offset)
+          (read-pack-entry-header stream)
+        (declare (ignore base-hash base-offset))
+        (is type 1 "Check if type is 1")
+        (is len 7877 "Check if length is 7877"))))
+  (let ((test2 '(230 13 134 110))) ;; (230 13) 2 bytes of type delta-offset
+    ;; 1006 - offset
+    (diag (format nil "Test decoding of the bytes ~a, type 6 and offset 1006" test2))
+    (flexi-streams:with-input-from-sequence (stream test2)
+      (multiple-value-bind (type len base-hash base-offset)
+          (read-pack-entry-header stream)
+        (declare (ignore base-hash))
+        (is type 6 "Check if type is 6")
+        (is len 214 "Check if length is 214")
+        (is base-offset 1006 "Check if offset is 1006")))))
+
+
 (finalize)

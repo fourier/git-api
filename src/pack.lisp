@@ -263,26 +263,28 @@ the value is a instance of PACK-ENTRY structure."
 (offset . compressed-size),  offset in the pack file and compressed
 size(including header).
 INDEX is a sorted list of pairs (sha1 . offset)"
-  (declare (optimize (speed 3) (safety 0) (debug 0)))
+  ;;(declare (optimize (speed 3) (safety 0) (debug 0)))
   (declare (type integer offset compressed-size i file-length))
-    ;; fill the table.
-    (loop with table = (make-hash-table :test #'equalp :size (length index))
-          for i from 0 below (length index)
-          for offset = (car (aref index i))
-          ;; calculate the compressed size (size in pack file).
-          ;; This size includes the header size as well
-          ;; The size is the  difference between data offset of the current
-          ;; and next entry...
-          for compressed-size =
-          (- (if (< i (1- (length index)))
-                 (car (aref index (1+ i)))
-                 ;; or end of file(without SHA-1 trailer of 20 bytes)
-                 (- file-length 20)) 
-             offset)
-          do
-          (setf (gethash (cdr (aref index i)) table)
-                (cons offset compressed-size))
-          finally (return table)))
+  ;; fill the table.
+  (loop with table = (make-hash-table :test #'equalp :size (length index))
+        and file-length = (- file-length 20)
+        and number-of-entries = (length index)
+        for i from 0 below number-of-entries
+        for offset = (car (aref index i))
+        ;; calculate the compressed size (size in pack file).
+        ;; This size includes the header size as well
+        ;; The size is the  difference between data offset of the current
+        ;; and next entry...
+        for compressed-size =
+        (- (if (< i (1- number-of-entries))
+               (car (aref index (1+ i)))
+               ;; or end of file(without SHA-1 trailer of 20 bytes)
+               file-length) 
+           offset)
+        do
+        (setf (gethash (cdr (aref index i)) table)
+              (cons offset compressed-size))
+        finally (return table)))
 
                                   
 
