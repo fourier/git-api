@@ -70,6 +70,10 @@
        (make-array 22 :element-type '(unsigned-byte 8) :initial-contents *sha-sequence-2*) 2)
        *sha-sequence-2-hex*
        "Array to hex test 2")
+  (is (sha1-to-hex
+       #(51 160 204 102 7 187 241 68 175 198 69 193 17 225 67 125 172 155 34 248))
+       "33a0cc6607bbf144afc645c111e1437dac9b22f8"
+       "Array to hex test 3 - the ordinary unoptimized version")
   (is (sha1-hex-to-array *sha-sequence-1-hex*)
       (make-array 20 :element-type '(unsigned-byte 8) :initial-contents (subseq *sha-sequence-1* 2))
       :test #'equalp

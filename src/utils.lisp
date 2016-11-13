@@ -93,13 +93,15 @@ read up to the size of file"
   "Reads the SHA1 code from either:
 - stream,
 - vector of unsigned bytes,
-- list of integers
+- list of integers (unoptimized version, used for debugging/logging etc)
+- array of integers (unoptimized version, used for debugging/logging etc)
 returns the downcase string representing SHA1 code in hex format.
 NOTE: OFFSET is ignored for streams"
   (typecase input
-    ((simple-array (unsigned-byte 8)) (sha1-array-to-hex input offset))
+    ((simple-array (unsigned-byte 8)) (sha1-optimized-array-to-hex input offset))
     (list (sha1-list-to-hex input offset))
     (stream (sha1-stream-to-hex input))
+    (array 'integer (sha1-normal-array-to-hex input offset))
     (t nil)))
 
 
@@ -110,6 +112,16 @@ NOTE: OFFSET is ignored for streams"
           do
           (format s "~2,'0x" (nth i lst)))
     s)))
+
+(defun sha1-normal-array-to-hex (arr offset)
+  ;; a SLOW version used only for dumping output to logs etc
+  (string-downcase
+   (with-output-to-string (s)  
+    (loop for i from offset below (+ offset 20)
+          do
+          (format s "~2,'0x" (aref arr i)))
+    s)))
+
 
 
 (defmacro digit-to-hex (dig)
@@ -124,7 +136,7 @@ NOTE: OFFSET is ignored for streams"
                  (+ (the fixnum (- ,digit-var 10)) *char-ascii-begin*)))))))
 
 
-(defun sha1-array-to-hex (array offset)
+(defun sha1-optimized-array-to-hex (array offset)
   ;;(declare (:explain :variables :calls))
   (declare (optimize (speed 3) (safety 0) (debug 0)))
   (declare (type fixnum offset))
