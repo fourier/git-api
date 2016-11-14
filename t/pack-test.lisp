@@ -331,7 +331,7 @@ applies from the current towards the oldest value")
 
 (subtest "Test of read-pack-entry-header"
   (let ((test1 '(149 236 3)))
-    (diag (format nil "Test decoding of the bytes ~a, type 1 and size 7877" test1))
+    ;(diag (format nil "Test decoding of the bytes ~a, type 1 and size 7877" test1))
     (flexi-streams:with-input-from-sequence (stream test1)
       (multiple-value-bind (type len base-hash base-offset)
           (read-pack-entry-header stream)
@@ -340,7 +340,7 @@ applies from the current towards the oldest value")
         (is len 7877 "Check if length is 7877"))))
   (let ((test2 '(230 13 134 110))) ;; (230 13) 2 bytes of type delta-offset
     ;; 1006 - offset
-    (diag (format nil "Test decoding of the bytes ~a, type 6 and offset 1006" test2))
+    ;(diag (format nil "Test decoding of the bytes ~a, type 6 and offset 1006" test2))
     (flexi-streams:with-input-from-sequence (stream test2)
       (multiple-value-bind (type len base-hash base-offset)
           (read-pack-entry-header stream)
