@@ -330,15 +330,28 @@ applies from the current towards the oldest value")
 
 
 (subtest "Test of read-pack-entry-header"
-  (let ((test1 '(149 236 3)))
+  (let ((test1 '(149 236 3)) ;; size + data
+        (test2 '(230 13 134 110)) ;; (230 13) 2 bytes of type delta-offset
+        ;;; Construct the test data to test delta reference:
+        ;;; size = 1000
+        ;;; type = 7
+        ;;; 1000 = b0000 0011 1110 1000
+        ;;; construct the header:
+        ;;; msb = 1
+        ;;; next 3 bits = 7 = b111
+        ;;; least significant 4 bits of 1000 = b1000
+        ;;; finally:
+        ;;; 1111 1000 0011 1110
+        ;;; = (248 62)
+        (test3 '(248 62 ;; type 7 size 1000
+                     215 110 78 238 213 150 237 246 100 169 216 63 218 18 212 248 93 78 247 12))) ;; 20 bytes sha1
     ;(diag (format nil "Test decoding of the bytes ~a, type 1 and size 7877" test1))
     (flexi-streams:with-input-from-sequence (stream test1)
       (multiple-value-bind (type len base-hash base-offset)
           (read-pack-entry-header stream)
         (declare (ignore base-hash base-offset))
         (is type 1 "Check if type is 1")
-        (is len 7877 "Check if length is 7877"))))
-  (let ((test2 '(230 13 134 110))) ;; (230 13) 2 bytes of type delta-offset
+        (is len 7877 "Check if length is 7877")))
     ;; 1006 - offset
     ;(diag (format nil "Test decoding of the bytes ~a, type 6 and offset 1006" test2))
     (flexi-streams:with-input-from-sequence (stream test2)
@@ -347,7 +360,17 @@ applies from the current towards the oldest value")
         (declare (ignore base-hash))
         (is type 6 "Check if type is 6")
         (is len 214 "Check if length is 214")
-        (is base-offset 1006 "Check if offset is 1006")))))
+        (is base-offset 1006 "Check if offset is 1006")))
+    (flexi-streams:with-input-from-sequence (stream test3)
+      (multiple-value-bind (type len base-hash base-offset)
+          (read-pack-entry-header stream)
+        (declare (ignore base-offset))
+        (is type 7 "Check if type is 7")
+        (is len 1000 "Check if length is 1000")
+        (is base-hash (coerce (subseq test3 2) 'vector)
+            (format nil "Check if hash is ~a" (sha1-to-hex (subseq test3 2))) :test #'equalp)))))
+    
+
 
 
 (finalize)

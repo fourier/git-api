@@ -359,6 +359,10 @@ And finally the length is 6144 + 1733 = 7833"
     (switch (type)
       (+obj-ref-delta+
        ;; just read the base hash
+       (setf base-hash
+             (make-array +sha1-size+
+                         :element-type '(unsigned-byte 8)
+                         :adjustable nil))
        (read-sequence base-hash stream))
       (+obj-ofs-delta+
        ;; read the variable-length integer
