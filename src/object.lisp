@@ -78,6 +78,7 @@
 (defun parse-git-file (filename)
   (declare (optimize speed))
   (let* ((data
+          ;; TODO: use zlib-wrapper
 ;;          (with-open-file (stream filename :direction :input :element-type '(unsigned-byte 8))
 ;;                 (chipz:decompress nil 'chipz:zlib stream)))
           (zlib:uncompress (read-binary-file filename)))
@@ -117,15 +118,20 @@ and returns a PAIR:
                                        :end (+ start size)
                                        :errorp nil
                                        :encoding :utf-8))
-         (last-char-pos (1- (the fixnum (length text))))
-         (newline-position (the fixnum (min (the fixnum (find-consecutive-newlines text))
-                                last-char-pos)))
+         (text-length (the fixnum (length text)))
+         ;; 3 cases:
+         ;; 1. 2 consecutive newlines in the middle of the text
+         ;; 2. consecutive newlines at the end of the text - newline-position = (leng - 1)
+         ;; 3. no consecutive newlines  - newline-position = length
+         (newline-position (the fixnum (find-consecutive-newlines text)))
          (header (the string (subseq text 0 newline-position)))
-         (comment (if (> (1+ last-char-pos) newline-position)
-                      (subseq text (+ 2 newline-position) last-char-pos)
-                      "")))
+         (comment (cond ((= newline-position text-length) ; no newlines found
+                         "")
+                        ((= newline-position (1- text-length)) ; newlines at the end
+                         "")
+                        (t (subseq text (+ 2 newline-position))))))
     (declare (type string text header comment)
-             (type fixnum last-char-pos newline-position))
+             (type fixnum text-length newline-position))
     (cons (split-sequence:split-sequence #\newline header)
           comment)))
 
