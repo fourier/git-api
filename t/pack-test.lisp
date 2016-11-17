@@ -438,7 +438,25 @@ command in the t/data/example-repo/objects/pack directory")
   ;; SHA-1 type size size-in-packfile offset-in-packfile
   ;; for deltified objects:
   ;; SHA-1 type size size-in-packfile offset-in-packfile depth base-SHA-1
-  nil)
+  ;; test: (inspect (parse-git-verify-pack-output +pack-file-git-output+))
+  (let* ((objects (mapcar (lambda (x) (split-sequence:split-sequence #\space x :remove-empty-subseqs t))
+                          (split-sequence:split-sequence #\newline output)))
+         (result (make-hash-table :test #'equalp :size (length objects))))
+    (mapc (lambda (obj)
+            (setf (gethash (car obj) result)
+                  (let ((entry
+                         (make-instance 'pack-entry :type
+                                        (intern (string-upcase (elt obj 1)) "KEYWORD")
+                                        :uncompressed-size (parse-integer (elt obj 2))
+                                        :compressed-size (parse-integer (elt obj 3))
+                                        :offset (parse-integer (elt obj 4)))))
+                    (when (> (length obj) 5) ; delta
+                      (change-class entry 'pack-entry-delta)
+                      (setf (pack-entry-base-hash entry) (elt obj 6)))
+                    entry)))
+          objects)
+    result))
+    
 
 (subtest "Test of the create-indexes-from-pack-file"
   (let ((tables

@@ -34,6 +34,7 @@
                :cl-fad
                :flexi-streams
                :nibbles
+               :split-sequence
                :prove)
   :components ((:module "t"
                 :components
