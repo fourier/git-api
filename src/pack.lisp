@@ -149,9 +149,8 @@ TYPE SIZE SIZE-IN-PACKFILE OFFSET-IN-PACKFILE"
 
 (defmethod print-object :after ((entry pack-entry-delta) stream)
   "Append to the information printed to the stream with base-SHA-1"
-  (when (pack-entry-base-hash entry)
-    (format stream " ~a"
-            (sha1-to-hex (pack-entry-base-hash entry)))))
+  (format stream " ~a"
+          (sha1-to-hex (pack-entry-base-hash entry))))
 
 ;;----------------------------------------------------------------------------
 ;; pack-file class

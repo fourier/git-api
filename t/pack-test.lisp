@@ -27,11 +27,23 @@
 (from git-api.pack import read-offsets read-fanout-table)
 ;; deltas
 (from git-api.pack import decode-delta-copy-cmd apply-delta)
+;; object constants
+(from git-api.pack import +obj-commit+ +obj-tag+ +obj-tree+ +obj-blob+)
 ;; pack file itself
 (from git-api.pack import create-pack-entries-table-initial)
 ;; aux function
 (from git-api.utils import sha1-to-hex)
-
+;; pack-entry related
+(from git-api.pack import
+      pack-entry
+      pack-entry-delta
+      pack-entry-offset
+      pack-entry-data-offset
+      pack-entry-compressed-size
+      pack-entry-uncompressed-size
+      pack-entry-type
+      pack-entry-base-hash)
+      
 
 (defparameter +network-vli-tests+
   '((240 128 112) 
@@ -371,6 +383,38 @@ applies from the current towards the oldest value")
             (format nil "Check if hash is ~a" (sha1-to-hex (subseq test3 2))) :test #'equalp)))))
     
 
+(subtest "pack-entry class test"
+;;;   pack-entry
+;;;   pack-entry-delta
+;;;   pack-entry-offset
+;;;   pack-entry-data-offset
+;;;   pack-entry-compressed-size
+;;;   pack-entry-uncompressed-size
+;;;   pack-entry-type
+;;;   pack-entry-base-hash
+;;;   
+  (let ((entry 
+         (make-instance 'pack-entry
+                        :type :commit
+                        :offset 100
+                        :compressed-size 200))
+        (entry-delta
+         (make-instance 'pack-entry-delta
+                        :offset 100
+                        :base-hash (make-array 20
+                                               :element-type '(unsigned-byte 8)
+                                               :initial-contents
+                                               '(215 110 78 238 213 150 237 246 100 169 216 63 218 18 212 248 93 78 247 12)))))
+    (is-print (princ entry) "commit 0 200 100" "Test print of pack-entry")
+    (is-print (princ entry-delta) "NIL 0 0 100 d76e4eeed596edf664a9d83fda12d4f85d4ef70c" "Test print of pack-entry-delta")
+    (setf (pack-entry-type entry) +obj-blob+)
+    (is-print (princ entry) "blob 0 200 100" "Test (setf (pack-entry-type entry) with +obj-blob+")
+    (setf (pack-entry-type entry) +obj-commit+)
+    (is-print (princ entry) "commit 0 200 100" "Test (setf (pack-entry-type entry) with +obj-commit+")
+    (setf (pack-entry-type entry) +obj-tag+)
+    (is-print (princ entry) "tag 0 200 100" "Test (setf (pack-entry-type entry) with +obj-tag+")
+    (setf (pack-entry-type entry) +obj-tree+)
+    (is-print (princ entry) "tree 0 200 100" "Test (setf (pack-entry-type entry) with +obj-tree+")))
 
 
 (finalize)
