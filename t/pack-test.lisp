@@ -461,8 +461,21 @@ command in the t/data/example-repo/objects/pack directory")
 (subtest "Test of the create-indexes-from-pack-file"
   (let ((tables
          (create-indexes-from-pack-file
-          (namestring (testfile "example-repo/objects/pack/pack-559f5160ab63a074f365f538d209164b5d8a715a.pack")))))
-    (maphash (lambda (k v) (format t "~a: ~a~%" k (sha1-to-hex v))) (car tables))
-    (maphash (lambda (k v) (format t "~a: ~a~%" (sha1-to-hex k) v)) (cdr tables))))
+          (namestring (testfile "example-repo/objects/pack/pack-559f5160ab63a074f365f538d209164b5d8a715a.pack"))))
+        (test-data (parse-git-verify-pack-output +pack-file-git-output+)))
+    (is (hash-table-count (car tables)) (hash-table-count test-data) "Check if size of the first parsed table is correct")
+    (is (hash-table-count (cdr tables)) (hash-table-count test-data) "Check if sizes of the second parsed table is correct")
+    ;; offsets table
+    (maphash (lambda (k v)
+               (is k (pack-entry-offset (gethash (sha1-to-hex v) test-data))
+                   (format nil "offsets table: check offset for entry ~a" (sha1-to-hex v))))
+             (car tables))
+    ;; initial index table
+    (maphash (lambda (k v)
+               (is (car v) (pack-entry-offset (gethash (sha1-to-hex k) test-data))
+                   (format nil "index table: Check offset for entry ~a" (sha1-to-hex k)))
+               (is (cdr v) (pack-entry-compressed-size (gethash (sha1-to-hex k) test-data))
+                   (format nil "index table: Check compressed size for entry ~a" (sha1-to-hex k))))
+             (cdr tables))))
 
 (finalize)
