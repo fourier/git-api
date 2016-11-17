@@ -173,8 +173,10 @@ The hash table with the mapping between sha1 binary code and entry")
 
 (defmethod initialize-instance :after ((self pack-file) &key &allow-other-keys)
   "Constructor for the pack-file class"
-  (with-slots (pack-filename) self
-    (parse-pack-file-impl self pack-filename)))
+  (with-slots (pack-filename offsets-table index-table) self
+    (let ((tables (create-indexes-from-pack-file pack-filename)))
+      (setf offsets-table (car tables))
+      (setf index-table (cdr tables)))))
 
 
 (defmethod pack-open-stream ((self pack-file))
@@ -219,42 +221,45 @@ The stream is previously opened with pack-close-stream"
     (concatenate 'string (subseq filename 0 pos) ".pack")))
 
 
-(defmethod parse-pack-file-impl ((self pack-file) filename)
-  "Parse the pack file(and index file) and return the hash table
-containing all the entries in this file.
-The key in the hash table is a hex-string SHA1 checksum of the object;
+(defun create-indexes-from-pack-file (filename)
+  "Parse the pack file(and index file) and return cons:
+(OFFSETS-TABLE, INDEX-TABLE)
+where:
+OFFSETS-TABLE is the hash-table with the key as offset and the value as sha1 hash of the object
+INDEX-TABLE is the hash table containing all the entries in this file.
+The key in this hash table is a hex-string SHA1 checksum of the object;
 the value is a instance of PACK-ENTRY structure."
-  (with-slots (index-table) self
-    ;; first parse index file
-    (multiple-value-bind (offsets-table index)
-        (parse-index-file (pack-filename-to-index filename))
-      (setf (slot-value self 'offsets-table) offsets-table)
-      ;; then open the pack file itself.
-      ;; at this point we know offsets of entries in pack file from the index file
-      (with-open-file (stream filename
-                              :direction :input
-                              :element-type '(unsigned-byte 8))
-        (let ((header (make-array 4
-                                  :element-type '(unsigned-byte 8)
-                                  :fill-pointer t)))
-          (read-sequence header stream :end 4)
-          ;; check header word
-          (unless (string= (octets-to-string header) +pack-file-header-word+)
+  ;; first parse index file
+  (multiple-value-bind (offsets-table index)
+      (parse-index-file (pack-filename-to-index filename))
+    ;; then open the pack file itself.
+    ;; at this point we know offsets of entries in pack file from the index file
+    (with-open-file (stream filename
+                            :direction :input
+                            :element-type '(unsigned-byte 8))
+      (let ((header (make-array 4
+                                :element-type '(unsigned-byte 8)
+                                :fill-pointer t)))
+        (read-sequence header stream :end 4)
+        ;; check header word
+        (unless (string= (octets-to-string header) +pack-file-header-word+)
+          (error 'corrupted-pack-file-error :text
+                 (format nil "Corrupted pack file ~a. Not expected header word ~a" filename (octets-to-string header))))
+        ;; check version = 2
+        (unless (= +pack-version+ (read-ub32/be stream))
+          (error 'corrupted-pack-file-error :text
+                 (format nil "Corrupted pack file ~a. Header is corrupted - expected version 2" filename)))
+        (let ((objects-count (read-ub32/be stream)))
+          ;; sanity check
+          (unless (= objects-count (length index))
             (error 'corrupted-pack-file-error :text
-                   (format nil "Corrupted pack file ~a. Not expected header word ~a" filename (octets-to-string header))))
-          ;; check version = 2
-          (unless (= +pack-version+ (read-ub32/be stream))
-            (error 'corrupted-pack-file-error :text
-                   (format nil "Corrupted pack file ~a. Header is corrupted - expected version 2" filename)))
-          (let ((objects-count (read-ub32/be stream)))
-            ;; sanity check
-            (unless (= objects-count (length index))
-              (error 'corrupted-pack-file-error :text
-                     (format nil "Corrupted pack file ~a. Number of objects ~d != index length ~d" filename objects-count (length index))))
-            ;; finally create the hash table with the mapping between
-            ;; sha1-binary code and entry 
-            (setf index-table
-                  (create-pack-entries-table-initial index (file-length stream)))))))))
+                   (format nil "Corrupted pack file ~a. Number of objects ~d != index length ~d" filename objects-count (length index))))
+          ;; finally create the hash table with the mapping between
+          ;; sha1-binary code and entry
+          ;; and return the pair (offsets-table, index-table)
+          (cons
+           offsets-table
+           (create-pack-entries-table-initial index (file-length stream))))))))
 
 
 (defun create-pack-entries-table-initial (index file-length)

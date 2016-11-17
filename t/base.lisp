@@ -18,7 +18,7 @@
 (defvar *test-data-path* (fad:merge-pathnames-as-directory (asdf:system-relative-pathname :git-api-test #P"t/") #P"data/"))
 
 (defun testfile (filename)
-  (merge-pathnames *test-data-path* filename))
+  (merge-pathnames filename *test-data-path*))
 
 
 (defmethod random-shufflef ((container list))
