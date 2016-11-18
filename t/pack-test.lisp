@@ -456,9 +456,15 @@ command in the t/data/example-repo/objects/pack directory")
                     entry)))
           objects)
     result))
-    
+
 
 (subtest "Test of the create-indexes-from-pack-file"
+  (is-error (create-indexes-from-pack-file (namestring (testfile "corrupted_pack0.pack"))) 'corrupted-pack-file-error
+            "Test for correct PACK file header")
+  (is-error (create-indexes-from-pack-file (namestring (testfile "corrupted_pack1.pack"))) 'corrupted-pack-file-error
+            "Test for correct version in PACK file header")
+  (is-error (create-indexes-from-pack-file (namestring (testfile "corrupted_pack2.pack"))) 'corrupted-pack-file-error
+            "Test for matching number of objects in index and pack file")
   (let ((tables
          (create-indexes-from-pack-file
           (namestring (testfile "example-repo/objects/pack/pack-559f5160ab63a074f365f538d209164b5d8a715a.pack"))))

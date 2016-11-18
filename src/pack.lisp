@@ -29,7 +29,7 @@
 ;; Pack file format
 ;;----------------------------------------------------------------------------
 
-(defparameter +pack-file-header-word+ "PACK"
+(defparameter +pack-file-header-word+ #(#x50 #x41 #x43 #x4b) ;; "PACK"
   "First bytes of the pack file")
 
 (defparameter +index-file-header-word+ #(255 116 79 99)
@@ -242,9 +242,9 @@ the value is a instance of PACK-ENTRY structure."
                                 :fill-pointer t)))
         (read-sequence header stream :end 4)
         ;; check header word
-        (unless (string= (octets-to-string header) +pack-file-header-word+)
+        (unless (equalp header +pack-file-header-word+)
           (error 'corrupted-pack-file-error :text
-                 (format nil "Corrupted pack file ~a. Not expected header word ~a" filename (octets-to-string header))))
+                 (format nil "Corrupted pack file ~a. Not expected header word ~x" filename header)))
         ;; check version = 2
         (unless (= +pack-version+ (read-ub32/be stream))
           (error 'corrupted-pack-file-error :text
