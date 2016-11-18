@@ -40,8 +40,9 @@
                 :components
                 ((:file "base")
                  (:file "coverage")
+                 (:test-file "utils-test")
                  (:test-file "pack-test")
-                 (:test-file "utils-test"))))
+                 (:test-file "object-test"))))
   :description "Test system for git-api"
 
   :defsystem-depends-on (:prove-asdf)
