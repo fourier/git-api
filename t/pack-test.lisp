@@ -484,4 +484,26 @@ command in the t/data/example-repo/objects/pack directory")
                    (format nil "index table: Check compressed size for entry ~a" (sha1-to-hex k))))
              (cdr tables))))
 
+
+
+(subtest "Test of the parse-pack-file and creation of instances of pack-file object"
+  (let ((blob-obj
+         (read-file-into-string (testfile "example-repo-extracted/dee95d63ff98bc1b1ef6e26ae7d83eb40d653d3e.contents")))
+        (delta-obj
+         (read-file-into-string (testfile "example-repo-extracted/9eeff76aaa278e9253b0106dfab6b8ab2619d695.contents")))
+        (pack
+         (parse-pack-file
+          (namestring (testfile "example-repo/objects/pack/pack-559f5160ab63a074f365f538d209164b5d8a715a.pack")))))
+    (is-type pack 'pack-file "Test if parse-pack-file returned instance of type pack-file")
+    (multiple-value-bind (blob size type)
+        (pack-get-object-by-hash pack "dee95d63ff98bc1b1ef6e26ae7d83eb40d653d3e")
+      (is type :blob "Test the type of object is correct")
+      (is blob-obj
+          (babel:octets-to-string blob :end size)
+          "Test of pack-get-object-by-hash for blob object"))
+     (is delta-obj
+        (babel:octets-to-string (pack-get-object-by-hash pack "9eeff76aaa278e9253b0106dfab6b8ab2619d695"))
+        "Test of pack-get-object-by-hash for delta object")))
+
+
 (finalize)

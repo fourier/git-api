@@ -613,8 +613,12 @@ to the INDEX-TABLE slot of the pack-file SELF object."
 
 
 (defmethod pack-get-object-by-hash ((self pack-file) hash)
-  "Find the object in the packfile. Return the uncompressed object
-from the pack file as a vector of bytes.
+  "Find the object in the packfile. Returns the uncompressed object
+from the pack file as a vector of bytes and the following information(values):
+Returns (values):
+- uncompressed object from the pack file as a vector of bytes.
+- size of this vector (number of meaningful bytes)
+- type of object, symbol
 HASH is as SHA1 code as as string (40 hex characters)"
   (sha1-hex-to-array hash *sha1-binary-array*)
   (pack-get-object-by-array-hash self *sha1-binary-array*))
