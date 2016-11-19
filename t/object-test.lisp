@@ -70,7 +70,7 @@
     65 55 70 72 110 83 111 89 108 57 54 104 53 118 43 67 114 86 43 68 121 66
     10 32 109 72 76 73 104 113 78 86 110 50)))
 
-(is-type (parse-git-object :tag +tag-object-data+ +tag-object-hash+ :start 0 :size +tag-object-size+) 'git-api.object::tag)
+(is-type (parse-git-object :tag +tag-object-data+ +tag-object-hash+ :start 0 :size +tag-object-size+) 'git-api.object:tag)
 
 
 (finalize)

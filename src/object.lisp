@@ -3,20 +3,24 @@
   (:use #:cl #:alexandria #:git-api.utils)
   (:export
    ;; object base
-   object-hash
-   ;; commit
+   object-hash 
+   ;; commit object
+   commit
    commit-tree
    commit-author
    commit-committer
    commit-comment
    commit-parents
    ;; blob
+   blob
    blob-content
    ;; tree entry readers
    tree-entry-name tree-entry-mode tree-entry-hash
-   ;; tree
+   ;; tree object
+   tree
    tree-entries
-   ;; tag
+   ;; tag object
+   tag
    tag-object
    tag-type
    tag-tagger
@@ -123,12 +127,11 @@
 
 (defmethod print-object ((self tag) stream)
   (with-slots (object type tagger tag comment) self
-    ))
-;;;     (format stream "object ~a~%" object)
-;;;     (format stream "type ~a~%" type)
-;;;     (format stream "tagger ~a~%" tagger)
-;;;     (format stream "tag ~a~%" tag)
-;;;     (format stream "comment~%~a" comment))) 
+    (format stream "object ~a~%" object)
+    (format stream "type ~a~%" type)
+    (format stream "tagger ~a~%" tagger)
+    (format stream "tag ~a~%" tag)
+    (format stream "comment~%~a" comment)))
 
 
 ;;----------------------------------------------------------------------------
