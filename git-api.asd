@@ -20,7 +20,6 @@
   :license "BSD" ;; https://opensource.org/licenses/bsd-license.php
   :depends-on (#:alexandria     ; general utilities - Public domain
                #:cl-fad         ; files manipulation - BSD
-               #:cl-annot       ; export annotations - LLGPL
                #:cl-ppcre       ; portable regular expressions - BSD
                #:babel          ; bytes to string - MIT
                #:zlib           ; zlib to deal with git objects - LLGPL

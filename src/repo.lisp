@@ -6,11 +6,19 @@
 ;;
 
 (defpackage #:git-api.repo
-  (:use #:cl #:cl-annot.class #:alexandria
-   #:git-api.utils #:git-api.pack #:git-api.object))
+  (:use #:cl #:alexandria
+   #:git-api.utils #:git-api.pack #:git-api.object)
+  (:export
+   make-git-repo
+   get-head-commit
+   get-commit-tree
+   get-object-by-hash
+   get-head-hash
+   get-commit-parents
+   get-commit
+   ))
 
 (in-package #:git-api.repo)
-(annot:enable-annot-syntax)
 
 ;;----------------------------------------------------------------------------
 ;; Constants
@@ -33,7 +41,6 @@ in .git/objects are containing objects (not a packfiles or info)")
 ;;----------------------------------------------------------------------------
 ;; Repository class
 ;;----------------------------------------------------------------------------
-@export-class
 (defclass git-repo ()
   ((path :initarg :path :reader git-repo-path
          :documentation "Path to the repository")
@@ -52,7 +59,6 @@ in .git/objects are containing objects (not a packfiles or info)")
   (:documentation "Class representing git repository"))
 
 
-@export
 (defun make-git-repo (path)
   (make-instance 'git-repo :path path))
 
@@ -139,7 +145,6 @@ in .git/objects are containing objects (not a packfiles or info)")
     
 
 
-@export
 (defmethod get-object-by-hash ((self git-repo) hash)
   "Returns the object by the given hash string"
   ;; first try if the file exists
@@ -173,7 +178,6 @@ in .git/objects are containing objects (not a packfiles or info)")
           (parse-git-file (gethash hash object-files))))))
 
 
-@export
 (defmethod get-head-hash ((self git-repo))
   (let* ((head-file (repo-path self "HEAD"))
          (head-contents (read-one-line head-file)))
@@ -198,17 +202,15 @@ refs/tags/v1.0"
           ;; otherwise find in packed refs
           (gethash ref packed-refs)))))
     
-@export
+
 (defmethod get-head-commit ((self git-repo))
   (get-commit self (get-head-hash self)))
 
 
-@export
 (defmethod get-commit-parents ((self git-repo) (object git-api.object:commit))
   (mapcar (curry #'get-commit self) (commit-parents object)))
 
 
-@export
 (defmethod get-commit ((self git-repo) hash)
   (with-slots (commits) self
     (if-let (commit (gethash hash commits))
