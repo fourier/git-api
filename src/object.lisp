@@ -1,62 +1,118 @@
 ;;;; object.lisp
 (defpackage #:git-api.object
-  (:use #:cl #:cl-annot.class #:alexandria #:git-api.utils))
+  (:use #:cl #:alexandria #:git-api.utils)
+  (:export
+   ;; object base
+   object-hash
+   ;; commit
+   commit-tree
+   commit-author
+   commit-committer
+   commit-comment
+   commit-parents
+   ;; blob
+   blob-content
+   ;; tree entry readers
+   tree-entry-name tree-entry-mode tree-entry-hash
+   ;; tree
+   tree-entries
+   ;; tag
+   tag-object
+   tag-type
+   tag-tagger
+   tag-comment
+   ;; exported functions
+   parse-git-file
+   parse-git-object
+   ))
+
 
 (in-package #:git-api.object)
-(annot:enable-annot-syntax)
+
 
 ;;----------------------------------------------------------------------------
 ;; Git Object class
 ;;----------------------------------------------------------------------------
-@export-class
 (defclass git-object ()
-  ((hash :initarg :hash :reader object-hash :type '(vector unsigned-byte 8)
+  ((hash :initarg :hash :reader object-hash :type '(vector unsigned-byte 8) :initform nil
          :documentation "Every git object has a SHA1-hash"))
   (:documentation "Base class for Git objects"))
 
 
-@export-class
+;;----------------------------------------------------------------------------
+;; Git Commit class
+;;----------------------------------------------------------------------------
 (defclass commit (git-object)
-  ((tree :initarg :tree :reader commit-tree :initform "" :type simple-string)
-   (author :initarg :author :reader commit-author :initform "" :type simple-string)
-   (committer :initarg :committer :reader commit-committer :initform "" :type simple-string)
-   (comment :initarg :comment :reader commit-comment :initform "" :type string)
-   (parents :initarg :parents :reader commit-parents :initform nil :type list))
+  ((tree :initarg :tree :reader commit-tree :initform "" :type simple-string
+         :documentation "SHA1-hash of the associated tree object")
+   (author :initarg :author :reader commit-author :initform "" :type simple-string
+           :documentation "String representing commit author field")
+   (committer :initarg :committer :reader commit-committer :initform "" :type simple-string
+              :documentation "String representing committer field")
+   (comment :initarg :comment :reader commit-comment :initform "" :type string
+            :documentation "Commit comment. Empty string if not comment")
+   (parents :initarg :parents :reader commit-parents :initform nil :type list
+            :documentation "A list of sha1 hashes of parents commits, even if only one parent"))
   (:documentation "Git Commit object"))
 
 (defmethod print-object ((self commit) stream)
-  (with-slots (tree author committer comment parents) self
+  "Print to STREAM the commit contents"
+  (with-slots (hash tree author committer comment parents) self
+    (format stream "commit: ~a~%" hash)
     (format stream "tree ~a~%" tree)
     (format stream "author ~a~%" author)
     (format stream "committer ~a~%" committer)
     (format stream "parents ~{~a~^, ~}~%" parents)
     (format stream "comment~%~a" comment))) 
 
-@export-class
+;;----------------------------------------------------------------------------
+;; Git Blob class
+;;----------------------------------------------------------------------------
 (defclass blob (git-object)
-  ((content :initarg :content :reader blob-content :initform nil :type '(vector unsigned-byte 8)))
+  ((content :initarg :content :reader blob-content :initform nil :type '(vector unsigned-byte 8)
+            :documentation "The blob object contents as a vector of unsigned bytes"))
   (:documentation "Git Blob object"))
 
 (defmethod print-object ((self blob) stream)
+  "Print to STREAM the size of the blob object"
   (with-slots (content) self
     (format stream "blob of size ~d bytes~%" (length content))))
 
-@export-class
-(defstruct tree-entry name mode hash)
 
-@export-class
+
+;;----------------------------------------------------------------------------
+;; Git Tree class
+;;----------------------------------------------------------------------------
+(defstruct tree-entry
+  "A struct representing particular tree entry: NAME, MODE, SHA1-hash"
+  name mode hash)
+
+(defmethod print-object ((self tree-entry) stream)
+  "Print to STREAM contents of the tree entry in format: MODE NAME HASH"
+  (format stream "~a ~a ~a"
+          (tree-entry-mode self)
+          (tree-entry-name self)
+          (tree-entry-hash self)))
+
+
 (defclass tree (git-object)
-  ((entries :initarg :entries :reader tree-entries :initform nil))
+  ((entries :initarg :entries :reader tree-entries :initform nil :type (or list nil)
+            :documentation "A list of tree entries (instances of TREE-ENTRY struct)"))
   (:documentation "Git Tree object"))
 
 
 (defmethod print-object ((self tree) stream)
+  "Print to STREAM the every tree entry in the tree object"
   (with-slots (entries) self
     (mapc (lambda (e)
             (format stream "~a~%" e))
           entries)))
 
-@export-class
+
+;;----------------------------------------------------------------------------
+;; Git Tag class
+;;----------------------------------------------------------------------------
+;; TODO: review and comment it
 (defclass tag (git-object)
   ((object :initarg :tree :reader tag-object :initform "")
    (type :initarg :author :reader tag-type :initform "")
@@ -67,14 +123,17 @@
 
 (defmethod print-object ((self tag) stream)
   (with-slots (object type tagger tag comment) self
-    (format stream "object ~a~%" object)
-    (format stream "type ~a~%" type)
-    (format stream "tagger ~a~%" tagger)
-    (format stream "tag ~a~%" tag)
-    (format stream "comment~%~a" comment))) 
+    ))
+;;;     (format stream "object ~a~%" object)
+;;;     (format stream "type ~a~%" type)
+;;;     (format stream "tagger ~a~%" tagger)
+;;;     (format stream "tag ~a~%" tag)
+;;;     (format stream "comment~%~a" comment))) 
 
 
-@export
+;;----------------------------------------------------------------------------
+;; Exported functions
+;;----------------------------------------------------------------------------
 (defun parse-git-file (filename)
   (declare (optimize speed))
   (let* ((data
@@ -98,13 +157,16 @@
                       :start (1+ content-start)
                       :size (parse-integer (cadr header-split)))))
 
-@export
 (defgeneric parse-git-object (type data hash &key start size))
 
 (defmethod parse-git-object ((obj (eql :blob)) data hash &key start size)
   (let ((blob (make-instance 'blob :hash hash :content (subseq data start (+ start size)))))
     blob))
 
+
+;;----------------------------------------------------------------------------
+;; Implementation
+;;----------------------------------------------------------------------------
 (defun parse-text-git-data (data start size)
   "Parses the data for text git objects (commit,tag)
 and returns a PAIR:
@@ -180,7 +242,7 @@ nothing found"
       (let* ((space-pos (position #\Space line))
              (key (subseq line 0 space-pos))
              (value (subseq line (1+ space-pos))))
-        (setf (slot-value self (intern (string-upcase key))) value)))
+        (setf (slot-value self (intern (string-upcase key) :git-api.object)) value)))
     self))
 
 
