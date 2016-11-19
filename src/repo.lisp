@@ -221,6 +221,7 @@ refs/tags/v1.0"
 (defmethod get-commit-tree ((self git-repo) (object git-api.object:commit))
   (let ((tree (make-hash-table :test #'equal))
         (children (list object)))
+    (setf (gethash (object-hash object) tree) object)
     (loop while children
           do
           (let* ((current (pop children))

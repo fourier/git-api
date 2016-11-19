@@ -42,7 +42,8 @@
                  (:file "coverage")
                  (:test-file "utils-test")
                  (:test-file "pack-test")
-                 (:test-file "object-test"))))
+                 (:test-file "object-test")
+                 (:test-file "repo-test"))))
   :description "Test system for git-api"
 
   :defsystem-depends-on (:prove-asdf)
