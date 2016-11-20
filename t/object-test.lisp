@@ -70,10 +70,47 @@
     65 55 70 72 110 83 111 89 108 57 54 104 53 118 43 67 114 86 43 68 121 66
     10 32 109 72 76 73 104 113 78 86 110 50)))
 
+(defparameter +simple-commit-object-data+
+  #(116 114 101 101 32 56 101 101 55 52 53 49 51 55 99 53 49 57 51 56 49 57
+    52 56 55 48 100 57 48 50 99 100 55 52 102 57 98 99 48 98 101 54 49 56
+    102 10 97 117 116 104 111 114 32 65 108 101 120 101 121 32 86 101 114 101 116 101
+    110 110 105 107 111 118 32 60 97 108 101 120 101 121 46 118 101 114 101 116 101 110
+    110 105 107 111 118 64 103 109 97 105 108 46 99 111 109 62 32 49 52 55 56 55
+    50 48 48 51 52 32 43 48 49 48 48 10 99 111 109 109 105 116 116 101 114 32
+    65 108 101 120 101 121 32 86 101 114 101 116 101 110 110 105 107 111 118 32 60 97
+    108 101 120 101 121 46 118 101 114 101 116 101 110 110 105 107 111 118 64 103 109 97
+    105 108 46 99 111 109 62 32 49 52 55 56 55 50 48 48 51 52 32 43 48 49
+    48 48 10 10 73 110 105 116 105 97 108 32 105 109 112 111 114 116 10))
+
+(defparameter +simple-commit-object-hash+ "0ec3337eede3a64aaed50f737adf163e9f8d92dc")
+
+(defparameter +simple-commit-object-size+ 217)
+
+
 (plan nil)
 
 
 (is-type (parse-git-object :tag +tag-object-data+ +tag-object-hash+ :start 0 :size +tag-object-size+) 'git-api.object:tag)
 
+(subtest "Test parsing of commits"
+  (let ((commit
+         (parse-git-object :commit (coerce +simple-commit-object-data+ '(vector (unsigned-byte 8)))
+                           +simple-commit-object-hash+ :start 0 :size +simple-commit-object-size+)))
+    (is-type commit 'git-api.object:commit "Test if parsed object is the instance of commit class")
+    (is (object-hash commit) "0ec3337eede3a64aaed50f737adf163e9f8d92dc" :test #'string=
+        "Test for commit hash")
+    (is (commit-author commit) "Alexey Veretennikov <alexey.veretennikov@gmail.com> 1478720034 +0100"
+        :test #'string=
+        "Test for commit author")
+    (is (commit-committer commit) "Alexey Veretennikov <alexey.veretennikov@gmail.com> 1478720034 +0100"
+        :test #'string=
+        "Test for commit committer")
+    (is (commit-tree commit) "8ee745137c51938194870d902cd74f9bc0be618f" :test #'string=
+        "Test for commit tree object")
+    (is (commit-parents commit) nil :test #'equalp
+        "Test for commit with no parents")
+    (is (commit-comment commit) "Initial import
+" :test #'string=
+        "Test for commit comment")))
 
 (finalize)
