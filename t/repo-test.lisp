@@ -21,6 +21,9 @@
 (plan nil)
 
 (subtest "Smoke test of the example repository"
+  (pprint (fad:list-directory (git-api.test.base:testfile "example-repo")))
+  (pprint (fad:list-directory (git-api.test.base:testfile "example-repo/refs/heads")))
+  (pprint (fad:list-directory (git-api.test.base:testfile "example-repo/refs/tags")))
   (let* ((repo (make-git-repo (namestring (testfile "example-repo")))))
     (is-type repo 'git-api.repo::git-repo "Check if we able to create repository object")
     (let ((commits-tree (get-commit-tree repo (get-head-commit repo))))
