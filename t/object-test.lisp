@@ -102,7 +102,6 @@
     49 52 55 57 55 53 56 54 50 57 32 43 48 49 48 48 10 10))
 
 (defparameter +empty-commit-object-hash+ "26aa178ffc4a43d61373f968a7f36dd642e1724f")
-)
 (defparameter +empty-commit-object-size+ 250)
 (defparameter +empty-commit-object-start+ 11)
 
