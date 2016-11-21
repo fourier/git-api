@@ -105,8 +105,33 @@
 )
 (defparameter +empty-commit-object-size+ 250)
 (defparameter +empty-commit-object-start+ 11)
-  
-  
+
+
+(defparameter +tree-data+
+  #(49 48 48 54 52 52 32 108 111 114 101 109 95 49 48 112 46 116 120 116 0 158 239 247 106 170 39 142
+    146 83 176 16 109 250 182 184 171 38 25 214 149 49 48 48 54 52 52 32 108 111
+    114 101 109 95 51 48 48 119 46 116 120 116 0 222 233 93 99 255 152 188 27 30
+    246 226 106 231 216 62 180 13 101 61 62 51 101 57 102 56 100 57 50 100 99 10
+    97 117 116 104 111 114 32 65 108 101 120 101 121 32 86 101 114 101 116 101 110 110
+    105 107 111 118 32 60 97 108 101 120 101 121 46 118 101 114 101 116 101 110 110 105
+    107 111 118 64 103 109 97 105 108 46 99 111 109 62 32 49 52 55 56 55 50 48
+    49 50 50 32 43 48 49 48 48 10 99 111 109 109 105 116 116 101 114 32 65 108
+    101 120 101 121 32 86 101 114 101 116 101 110 110 105 107 111 118 32 60 97 108 101
+    120 101 121 46 118 101 114 101 116 101 110 110 105 107 111 118 64 103 109 97 105 108
+    46 99 111 109 62 32 49 52 55 56 55 50 48 49 50 50 32 43 48 49 48 48
+    10 10 67 104 97 110 103 101 100 32 116 101 120 116 10 32 102 105 108 101 10 101
+    114 111 44 32 98 105 98 101 110 100 117 109 32 115 117 115 99 105 112 105 116 32
+    116 111 114 116 111 114 32 100 117 105 32 101 116 32 111 114 99 105 46 32 70 117
+    115 99 101 32 110 111 110 32 101 120 32 113 117 105 115 32 113 117 97 109 32 102
+    97 117 99 105 98 117 115 32 112 114 101 116 105 117 109 46 32 80 104 97 115 101
+    108 108 117 115 32 113 117 105 115 32 108 111 114 101 109 32 101 116 32 116 101 108
+    108 117 115 32 101 102 102 105 99 105 116 117 114 32 112 104 97 114 101 116 114 97))
+(defparameter +tree-data-size+ 83)
+(defparameter +tree-data-hash+ "aca7baf1ea0bc6cc23f92edf55ac2e4ea6586f21")
+(defparameter +tree-data-parsed+ 
+  '(("100644" "lorem_10p.txt" "9eeff76aaa278e9253b0106dfab6b8ab2619d695")
+    ("100644" "lorem_300w.txt" "dee95d63ff98bc1b1ef6e26ae7d83eb40d653d3e")))
+
 
 (plan nil)
 
@@ -162,8 +187,24 @@ parents 84c5c1f741ed4e72ffe7f6152111fc4288a632cb
 comment
 " "Test of print function of the commit object")))
 
-(subtest "Test of parsing tree line"
-  
+
+(subtest "Testing of the parsing of tree objects"
+  (flet ((compare-entries (entry parsed-entry)
+           (and (string= (tree-entry-mode entry) (car parsed-entry))
+                (string= (tree-entry-name entry) (cadr parsed-entry))
+                (string= (tree-entry-hash entry) (caddr parsed-entry)))))
+    (let ((tree
+           (parse-git-object :tree (coerce +tree-data+ '(vector (unsigned-byte 8)))
+                             +tree-data-hash+ :start 0 :size +tree-data-size+)))
+      (is-type tree 'git-api.object:tree "Test if parsed object is the instance of tree class")
+      (is-type (tree-entries tree) 'list "Test if tree entries are not null")
+      (is (length (tree-entries tree)) 2 "Test the number of tree entries")
+      (loop for entry in (tree-entries tree)
+            for parsed-entry in +tree-data-parsed+
+            for i = 1 then (incf i)
+            do
+            (is entry parsed-entry :test #'compare-entries (format nil "Compare tree entry ~d" i))))))
+    
 
 
 (finalize)
