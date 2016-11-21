@@ -87,12 +87,33 @@
 (defparameter +simple-commit-object-size+ 217)
 
 
+(defparameter +empty-commit-object-data+
+  #(99 111 109 109 105 116 32 50 53 48 0 116 114 101 101 32 55 51 52 101 100 100 57
+    102 101 56 49 53 102 48 56 98 53 50 53 102 50 51 52 50 97 53 48 98 97
+    51 57 100 97 53 97 57 100 51 97 100 10 112 97 114 101 110 116 32 56 52 99
+    53 99 49 102 55 52 49 101 100 52 101 55 50 102 102 101 55 102 54 49 53 50
+    49 49 49 102 99 52 50 56 56 97 54 51 50 99 98 10 97 117 116 104 111 114
+    32 65 108 101 120 101 121 32 86 101 114 101 116 101 110 110 105 107 111 118 32 60
+    97 108 101 120 101 121 46 118 101 114 101 116 101 110 110 105 107 111 118 64 103 109
+    97 105 108 46 99 111 109 62 32 49 52 55 57 55 53 56 54 50 57 32 43 48
+    49 48 48 10 99 111 109 109 105 116 116 101 114 32 65 108 101 120 101 121 32 86
+    101 114 101 116 101 110 110 105 107 111 118 32 60 97 108 101 120 101 121 46 118 101
+    114 101 116 101 110 110 105 107 111 118 64 103 109 97 105 108 46 99 111 109 62 32
+    49 52 55 57 55 53 56 54 50 57 32 43 48 49 48 48 10 10))
+
+(defparameter +empty-commit-object-hash+ "26aa178ffc4a43d61373f968a7f36dd642e1724f")
+)
+(defparameter +empty-commit-object-size+ 250)
+(defparameter +empty-commit-object-start+ 11)
+  
+  
+
 (plan nil)
 
 
 (is-type (parse-git-object :tag +tag-object-data+ +tag-object-hash+ :start 0 :size +tag-object-size+) 'git-api.object:tag)
 
-(subtest "Test parsing of commits"
+(subtest "Test parsing of commit without parent"
   (let ((commit
          (parse-git-object :commit (coerce +simple-commit-object-data+ '(vector (unsigned-byte 8)))
                            +simple-commit-object-hash+ :start 0 :size +simple-commit-object-size+)))
@@ -112,5 +133,37 @@
     (is (commit-comment commit) "Initial import
 " :test #'string=
         "Test for commit comment")))
+
+(subtest "Test parsing of commit with empty comment"
+  (let ((commit
+         (parse-git-object :commit (coerce +empty-commit-object-data+ '(vector (unsigned-byte 8)))
+                           +empty-commit-object-hash+ :start +empty-commit-object-start+ :size +empty-commit-object-size+)))
+    (is-type commit 'git-api.object:commit "Test if parsed object is the instance of commit class")
+    (is (object-hash commit) "26aa178ffc4a43d61373f968a7f36dd642e1724f" :test #'string=
+        "Test for commit hash")
+    (is (commit-author commit) "Alexey Veretennikov <alexey.veretennikov@gmail.com> 1479758629 +0100"
+        :test #'string=
+        "Test for commit author")
+    (is (commit-committer commit) "Alexey Veretennikov <alexey.veretennikov@gmail.com> 1479758629 +0100"
+        :test #'string=
+        "Test for commit committer")
+    (is (commit-tree commit) "734edd9fe815f08b525f2342a50ba39da5a9d3ad" :test #'string=
+        "Test for commit tree object")
+    (is (commit-parents commit) '("84c5c1f741ed4e72ffe7f6152111fc4288a632cb") :test #'equalp
+        "Test for parent commit")
+    (is (commit-comment commit) "" :test #'string=
+        "Test for commit comment")
+    ;; test print
+    (is-print (format t "~a" commit) "commit: 26aa178ffc4a43d61373f968a7f36dd642e1724f
+tree 734edd9fe815f08b525f2342a50ba39da5a9d3ad
+author Alexey Veretennikov <alexey.veretennikov@gmail.com> 1479758629 +0100
+committer Alexey Veretennikov <alexey.veretennikov@gmail.com> 1479758629 +0100
+parents 84c5c1f741ed4e72ffe7f6152111fc4288a632cb
+comment
+" "Test of print function of the commit object")))
+
+(subtest "Test of parsing tree line"
+  
+
 
 (finalize)

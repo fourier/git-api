@@ -186,15 +186,14 @@ and returns a PAIR:
          (text-length (the fixnum (length text)))
          ;; 3 cases:
          ;; 1. 2 consecutive newlines in the middle of the text
-         ;; 2. consecutive newlines at the end of the text - newline-position = (leng - 1)
+         ;; 2. consecutive newlines at the end of the text - newline-position = (length - 2)
          ;; 3. no consecutive newlines  - newline-position = length
          (newline-position (the fixnum (find-consecutive-newlines text)))
          (header (the string (subseq text 0 newline-position)))
-         (comment (cond ((= newline-position text-length) ; no newlines found
-                         "")
-                        ((= newline-position (1- text-length)) ; newlines at the end
-                         "")
-                        (t (subseq text (+ 2 newline-position))))))
+         (comment
+          (if (>= newline-position (- text-length 2))
+              ""
+              (subseq text (+ 2 newline-position)))))
     (declare (type string text header comment)
              (type fixnum text-length newline-position))
     (cons (split-sequence:split-sequence #\newline header)
