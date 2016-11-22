@@ -268,7 +268,18 @@ comment
 
 
 (subtest "Testing of parse-git-file"
-  (ok "Not implemented"))
+  (let ((parsed1 
+         (parse-git-file (namestring (testfile "example-objects/52/00e67faf9a9a39b916f7779fe98bcaa47eda0c"))))
+        (parsed2
+         (parse-git-file (namestring (testfile "example-objects/52/4acfffa760fd0b8c1de7cf001f8dd348b399d8")))))
+    (is-type parsed1 'git-api.object::commit "Check the parsed commit type")
+    (is-type
+     (parse-git-file (testfile "example-objects/52/00e67faf9a9a39b916f7779fe98bcaa47eda0c"))
+     'git-api.object::commit "Check the parsed commit type with a name as pathname")
+    (is-type parsed2 'git-api.object::blob "Check the parsed blob type")
+    (print parsed2)
+    (is (babel:octets-to-string (blob-content parsed2) ) (concatenate 'string "Test file" '(#\newline))
+        :test #'string= "Test of the blob file contents")))
 
 
 

@@ -268,17 +268,18 @@ nothing found"
   ;; [mode] [file/folder name]\0[SHA-1 of referencing blob or tree]
   ;; mode is a string, file/folder name is a string,
   ;; SHA-1 code is 20 bytes
-  (let ((self (make-instance 'tree :hash hash))
-        (next-start start))
-    ;; parse in the loop until the end reached
-    (loop while (< next-start (+ start size))
+  ;; parse in the loop until the end reached
+    (loop with self = (make-instance 'tree :hash hash)
+          and next-start = start
+          while (< next-start (+ start size))
           do
           (let ((parsed (parse-tree-entry data next-start)))
             ;; push the value
             (push (car parsed) (slot-value self 'entries))
             ;; ... and increase the position
-            (setf next-start (cdr parsed))))
-    ;; finally reverse the parsed list
-    (setf (slot-value self 'entries) (nreverse (slot-value self 'entries)))
-    self))
+            (setf next-start (cdr parsed)))
+          finally
+          ;; finally reverse the parsed list
+          (setf (slot-value self 'entries) (nreverse (slot-value self 'entries)))
+          (return self)))
 
