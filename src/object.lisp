@@ -206,7 +206,7 @@ Returns the index of the first element found or size of STR if
 nothing found"
   (declare (type string str)
            (type fixnum first last))
-  (declare (optimize (speed 3) (safety 0)))
+  (declare (optimize (speed 3) (safety 0) (debug 0)))
   (if (/= first last)
       (loop with next fixnum = (1+ first)
             while (/= next last)

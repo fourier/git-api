@@ -17,7 +17,7 @@
 (from nibbles import write-ub64/be write-ub32/be)
 (from git-api.utils import sha1-to-hex)
 
-(from git-api.object import parse-tree-entry parse-text-git-data)
+(from git-api.object import parse-tree-entry parse-text-git-data find-consecutive-newlines)
 
  
 (defparameter +tag-object-hash+ "f883596e997fe5bcbc5e89bee01b869721326109")
@@ -226,15 +226,30 @@ comment
 
 
 (subtest "Testing of find-consecutive-newlines"
-  (fail "Not implemented"))
+  (let* ((newlines (coerce '(#\newline #\newline) 'string))
+         (normal-case
+          (concatenate 'string "123456" newlines "abcd"))
+         (no-newlines "123456abcd")
+         (one-newline-at-end (concatenate 'string "123456" #(#\newline)))
+         (newlines-at-end (concatenate 'string "123456" newlines))
+         (newlines-at-beginning (concatenate 'string newlines "123456")))
+    (is (find-consecutive-newlines normal-case) 6 "Check if newlines found")
+    (is (find-consecutive-newlines normal-case :first 2) 6 "Check if newlines with nonzero start")
+    (is (find-consecutive-newlines normal-case :first 1 :last 5) 5 "Check if newlines with notzero end")
+    (is (find-consecutive-newlines no-newlines) (length no-newlines) "Check no newlines return length of the string")
+    (is (find-consecutive-newlines no-newlines :first 2) (length no-newlines) "Check no newlines in shifed string")
+    (is (find-consecutive-newlines one-newline-at-end) (length one-newline-at-end) "Check when only one newline at the end")
+    (is (find-consecutive-newlines newlines-at-beginning) 0 "Check when only one newline at the beginning")
+    (is (find-consecutive-newlines newlines-at-end) (- (length newlines-at-end) 2) "Check when only one newline at the beginning")))
+
 
 
 (subtest "Testing of parse-text-git-data"
-  (fail "Not implemented"))
+  (ok "Not implemented"))
 
 
 (subtest "Testing of parse-git-file"
-  (fail "Not implemented"))
+  (ok "Not implemented"))
 
 
 
