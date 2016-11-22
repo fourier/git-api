@@ -17,6 +17,8 @@
 (from nibbles import write-ub64/be write-ub32/be)
 (from git-api.utils import sha1-to-hex)
 
+(from git-api.object import parse-tree-entry parse-text-git-data)
+
  
 (defparameter +tag-object-hash+ "f883596e997fe5bcbc5e89bee01b869721326109")
 (defparameter +tag-object-size+ 960)
@@ -203,7 +205,37 @@ comment
             for i = 1 then (incf i)
             do
             (is entry parsed-entry :test #'compare-entries (format nil "Compare tree entry ~d" i))))))
-    
+
+
+
+(subtest "Testing of parse-tree-entry"
+  (let* ((mode "100100")
+         (fname "mycoolfile.txt")
+         (header (babel:string-to-octets (concatenate 'string mode " " fname)))
+         (hash #(49 48 48 54 52 52 32 108 111 114 101 109 95 49 48 112 46 116 120 116 ))
+         ;; create an entry with some initial bytes
+         (entry (coerce (concatenate 'vector #(1 2 3) header #(0) hash) '(vector (unsigned-byte 8)))))
+    (let ((parsed-entry (parse-tree-entry entry 3)))
+      (is-type parsed-entry 'cons "Check if parsed entry result is a cons")
+      (is-type (car parsed-entry) 'git-api.object::tree-entry "Check if a parsed entry is has a proper type")
+      (is (tree-entry-hash (car parsed-entry)) (sha1-to-hex hash) :test #'string= "Check hash")
+      (is (tree-entry-mode (car parsed-entry)) mode :test #'string= "Check mode")
+      (is (tree-entry-name (car parsed-entry)) fname :test #'string= "Check name")
+      (is (cdr parsed-entry) (length entry)
+          "Check the position of the next tree entry is correct"))))
+
+
+(subtest "Testing of find-consecutive-newlines"
+  (fail "Not implemented"))
+
+
+(subtest "Testing of parse-text-git-data"
+  (fail "Not implemented"))
+
+
+(subtest "Testing of parse-git-file"
+  (fail "Not implemented"))
+
 
 
 (finalize)

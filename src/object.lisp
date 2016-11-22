@@ -261,7 +261,7 @@ nothing found"
                            ;; need to downcase to be compatible with the representation
                            ;; in the file system
                            (sha1-to-hex hash))
-          (+ 20 separator))))
+          (+ 21 separator))))
 
 (defmethod parse-git-object ((obj (eql :tree)) data hash &key start size)
   ;; format:
@@ -277,7 +277,7 @@ nothing found"
             ;; push the value
             (push (car parsed) (slot-value self 'entries))
             ;; ... and increase the position
-            (setf next-start (1+ (cdr parsed)))))
+            (setf next-start (cdr parsed))))
     ;; finally reverse the parsed list
     (setf (slot-value self 'entries) (nreverse (slot-value self 'entries)))
     self))
