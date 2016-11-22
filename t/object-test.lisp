@@ -19,6 +19,7 @@
 
 (from git-api.object import parse-tree-entry parse-text-git-data find-consecutive-newlines)
 
+(defparameter +newlines+ (coerce '(#\newline #\newline) 'string))
  
 (defparameter +tag-object-hash+ "f883596e997fe5bcbc5e89bee01b869721326109")
 (defparameter +tag-object-size+ 960)
@@ -207,7 +208,6 @@ comment
             (is entry parsed-entry :test #'compare-entries (format nil "Compare tree entry ~d" i))))))
 
 
-
 (subtest "Testing of parse-tree-entry"
   (let* ((mode "100100")
          (fname "mycoolfile.txt")
@@ -226,13 +226,12 @@ comment
 
 
 (subtest "Testing of find-consecutive-newlines"
-  (let* ((newlines (coerce '(#\newline #\newline) 'string))
-         (normal-case
-          (concatenate 'string "123456" newlines "abcd"))
+  (let* ((normal-case
+          (concatenate 'string "123456" +newlines+ "abcd"))
          (no-newlines "123456abcd")
          (one-newline-at-end (concatenate 'string "123456" #(#\newline)))
-         (newlines-at-end (concatenate 'string "123456" newlines))
-         (newlines-at-beginning (concatenate 'string newlines "123456")))
+         (newlines-at-end (concatenate 'string "123456" +newlines+))
+         (newlines-at-beginning (concatenate 'string +newlines+ "123456")))
     (is (find-consecutive-newlines normal-case) 6 "Check if newlines found")
     (is (find-consecutive-newlines normal-case :first 2) 6 "Check if newlines with nonzero start")
     (is (find-consecutive-newlines normal-case :first 1 :last 5) 5 "Check if newlines with notzero end")
@@ -240,12 +239,32 @@ comment
     (is (find-consecutive-newlines no-newlines :first 2) (length no-newlines) "Check no newlines in shifed string")
     (is (find-consecutive-newlines one-newline-at-end) (length one-newline-at-end) "Check when only one newline at the end")
     (is (find-consecutive-newlines newlines-at-beginning) 0 "Check when only one newline at the beginning")
-    (is (find-consecutive-newlines newlines-at-end) (- (length newlines-at-end) 2) "Check when only one newline at the beginning")))
+    (is (find-consecutive-newlines newlines-at-end) (- (length newlines-at-end) 2) "Check when only one newline at the beginning")
+    (is (find-consecutive-newlines newlines-at-beginning :first 20 :last 20) 20 "Check when first = last")))
 
 
 
 (subtest "Testing of parse-text-git-data"
-  (ok "Not implemented"))
+  (let* ((header (concatenate 'string "aaaline1" #(#\newline) "line2"))
+         (comment1 "hello")
+         (comment2 "")
+         (comment3 (concatenate 'string "comment" #(#\newline))))
+    (let* ((data1 (babel:string-to-octets (concatenate 'string header +newlines+ comment1)))
+           (parsed1 (parse-text-git-data data1 3 (- (length data1) 3))))
+      (is (caar parsed1) "line1" :test #'string= "Test of the header line 1")
+      (is (cadar parsed1) "line2" :test #'string= "Test of the header line 2")
+      (is (cdr parsed1) comment1 :test #'string= "Test of comment 1"))
+    (let* ((data2 (babel:string-to-octets (concatenate 'string header +newlines+ comment2)))
+           (parsed2 (parse-text-git-data data2 3 (- (length data2) 3))))
+      (is (caar parsed2) "line1" :test #'string= "Test of the header line 1")
+      (is (cadar parsed2) "line2" :test #'string= "Test of the header line 2")
+      (is (cdr parsed2) comment2 :test #'string= "Test of comment 2"))
+    (let* ((data3 (babel:string-to-octets (concatenate 'string header +newlines+ comment3)))
+           (parsed3 (parse-text-git-data data3 3 (- (length data3) 3))))
+      (is (caar parsed3) "line1" :test #'string= "Test of the header line 1")
+      (is (cadar parsed3) "line2" :test #'string= "Test of the header line 2")
+      (is (cdr parsed3) comment3 :test #'string= "Test of comment 3"))))
+
 
 
 (subtest "Testing of parse-git-file"
