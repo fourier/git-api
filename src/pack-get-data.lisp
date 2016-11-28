@@ -147,7 +147,7 @@ will take the variable *try-use-temporary-output-buffer* into consideration"
           ;; uncompress chunk
           (let* ((foreign-output (static-vector-pointer output))
                  (result
-                  (git-api.zlib-wrapper::uncompress
+                  (git-api.zlib-wrapper:uncompress
                    foreign-output
                    *uncompressed-size-ptr*
                    (static-vector-pointer input)

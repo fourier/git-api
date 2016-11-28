@@ -1,7 +1,11 @@
 ;;;; zlib-wrapper.lisp
 (defpackage #:git-api.zlib-wrapper
   (:use #:cl #:cffi)
-  (:export uncompress *zlib-loaded*))
+  (:export uncompress *zlib-loaded* test-inflate-init
+   zlib-version
+   inflate-init_
+   inflate
+   inflate-end))
 
 (in-package #:git-api.zlib-wrapper)
 
@@ -116,3 +120,59 @@
   (source (:pointer :unsigned-char))
   (source-len :unsigned-long))
 
+
+;;;  const char * ZEXPORT zlibVersion
+(defcfun ("zlibVersion" zlib-version) (:pointer :char))
+
+
+;;; inflateInit
+;; inflateInit_
+;; inflateInit_((strm), ZLIB_VERSION, (int)sizeof(z_stream) = 112)
+(defcfun ("inflateInit_" inflate-init_) :int
+  (strm (:pointer (:struct z-stream)))
+  (version :string)
+  (sizeofstream :int))
+
+;;; inflate
+;; int ZEXPORT inflate OF((z_streamp strm, int flush))
+(defcfun ("inflate" inflate) :int
+  (strm (:pointer (:struct z-stream)))
+  (flush :int))
+
+
+;;; inflateEnd
+;; int ZEXPORT inflateEnd OF((z_streamp strm));
+(defcfun ("inflateEnd" inflate-end) :int
+  (strm (:pointer (:struct z-stream))))
+
+
+(defun test-inflate-init ()
+  ;; get the size of the struct (on 64 bits and 32 bits they are different)
+  (let ((stream-size (foreign-type-size '(:struct z-stream))))
+    ;; create a stream struct
+    (with-foreign-object (strm '(:struct z-stream))
+      ;; clear the stream struct
+      (foreign-funcall "memset" :pointer strm :int 0 :int stream-size)
+      ;; initialize the stream
+      (inflate-init_ strm (zlib-version) stream-size)
+      (inflate-end strm))))
+
+
+(defun uncompress-first-bytes (data uncompressed-size)
+  ;; get the size of the struct (on 64 bits and 32 bits they are different)
+  (let ((stream-size (foreign-type-size '(:struct z-stream))))
+    ;; create a stream struct
+    (with-foreign-object (strm '(:struct z-stream))
+      ;; clear the stream struct
+      (foreign-funcall "memset" :pointer strm :int 0 :int stream-size)
+      ;; initalize values in struct
+      (with-foreign-slots ((next-in avail-in next-out avail-out) strm (:struct z-stream))
+        (setf next-in data
+              avail-in (length data)
+              next-out nil; buf
+              avail-out uncompressed-size))
+      ;; initialize the stream
+      (inflate-init_ strm (zlib-version) stream-size)
+      (inflate strm +z-finish+)
+      (inflate-end strm))))
+  
