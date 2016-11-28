@@ -5,7 +5,7 @@
 (defpackage #:git-api.zlib.wrapper
   (:use #:cl #:alexandria #:git-api.utils #:static-vectors)
   (:export *try-use-temporary-output-buffer*
-   get-object-data))
+   uncompress-stream))
 
 (in-package #:git-api.zlib.wrapper)
 
@@ -51,7 +51,7 @@ This buffer is used with CFFI version of zlib")
   "A pointer to the uncompressed size used by CFFI zlib uncompress function")
 
 (declaim (inline dispatch))
-(defun get-object-data (offset compressed-size uncompressed-size stream)
+(defun uncompress-stream (offset compressed-size uncompressed-size stream)
   ;; try to guess which version to use
   (cond
    ;; first try CFFI version as the fastest

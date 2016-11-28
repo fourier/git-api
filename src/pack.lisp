@@ -660,10 +660,10 @@ Returns (values):
 and size of this data as values(data, size)"
   (declare (ignore pack))
   (values 
-   (get-object-data (pack-entry-data-offset entry)
-                    (pack-entry-compressed-size entry)
-                    (pack-entry-uncompressed-size entry)
-                    stream)
+   (uncompress-stream (pack-entry-data-offset entry)
+                      (pack-entry-compressed-size entry)
+                      (pack-entry-uncompressed-size entry)
+                      stream)
    (pack-entry-uncompressed-size entry)))
 
 
@@ -689,10 +689,10 @@ object is known only when we parse delta object."
       (setf (pack-entry-type entry) type)
       ;; merge
       (let ((chunk 
-             (apply-delta parent (get-object-data (pack-entry-data-offset entry)
-                                                  (pack-entry-compressed-size entry)
-                                                  (pack-entry-uncompressed-size entry)
-                                                  stream))))
+             (apply-delta parent (uncompress-stream (pack-entry-data-offset entry)
+                                                    (pack-entry-compressed-size entry)
+                                                    (pack-entry-uncompressed-size entry)
+                                                    stream))))
         ;; finally return chunk and its length
         (values chunk (length chunk))))))
     
