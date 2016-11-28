@@ -5,12 +5,17 @@
 ;;
 (defpackage #:git-api.zlib.cffi
   (:use #:cl #:cffi)
-  (:export uncompress *zlib-loaded*
+  (:export
+   *zlib-loaded*
+   uncompress
+   z-stream
    zlib-version
    inflate-init_
    inflate
    inflate-end
-   memset))
+   memset
+   next-in avail-in next-out avail-out
+   +z-finish+ +z-ok+ +z-stream-end+))
 
 (in-package #:git-api.zlib.cffi)
 

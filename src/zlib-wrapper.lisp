@@ -3,7 +3,7 @@
 ;; This package reads the compressed entry from the pack file
 ;;
 (defpackage #:git-api.zlib.wrapper
-  (:use #:cl #:alexandria #:git-api.utils #:static-vectors)
+  (:use #:cl #:alexandria #:git-api.utils #:static-vectors #:git-api.zlib.cffi)
   (:export *try-use-temporary-output-buffer*
    uncompress-stream
    uncompress-git-file))
@@ -57,18 +57,18 @@ This buffer is used with CFFI version of zlib")
   (cond
    ;; first try CFFI version as the fastest
    (git-api.zlib.cffi:*zlib-loaded*
-    (get-object-data-cffi offset compressed-size uncompressed-size stream))
+    (uncompress-stream-cffi offset compressed-size uncompressed-size stream))
    ;; as a fallback solution try to use patched CL zlib
    ;; patched means it supports manually specified output buffer
    ((or (> zlib::+zlib-major-version+ 0)
         (> zlib::+zlib-minor-version+ 1))
-    (get-object-data-patched-zlib offset compressed-size uncompressed-size stream))
+    (uncompress-stream-patched-zlib offset compressed-size uncompressed-size stream))
    ;; ... and finally try to use default (unpatched) CL zlib
    (t
-    (get-object-data-git-zlib offset compressed-size uncompressed-size stream))))
+    (uncompress-stream-git-zlib offset compressed-size uncompressed-size stream))))
 
 
-(defun get-object-data-git-zlib (offset compressed-size uncompressed-size stream)
+(defun uncompress-stream-git-zlib (offset compressed-size uncompressed-size stream)
   "Return the uncompressed data for pack-entry from the opened file stream.
 This function uses the CL zlib library from https://gitlab.common-lisp.net/
 This zlib library version doesn't allow to specify output buffer, hence
@@ -86,7 +86,7 @@ buffers allocated all the time"
      object) :uncompressed-size uncompressed-size))
 
 
-(defun get-object-data-patched-zlib (offset compressed-size uncompressed-size stream)
+(defun uncompress-stream-patched-zlib (offset compressed-size uncompressed-size stream)
   "Return the uncompressed data for pack-entry from the opened file stream.
 This function uses the CL zlib library from https://github.com/fourier/zlib
 This zlib library version allows to specify output buffer, so the implementation
@@ -116,7 +116,7 @@ will take the variable *try-use-temporary-output-buffer* into consideration"
     (zlib:uncompress read-buffer :output-buffer output-buffer :start 0 :end compressed-size)))
 
 
-(defun get-object-data-cffi (offset compressed-size uncompressed-size stream)
+(defun uncompress-stream-cffi (offset compressed-size uncompressed-size stream)
   "Return the uncompressed data for pack-entry from the opened file stream.
 This function uses the C zlib library using CFFI. The implementation
 will take the variable *try-use-temporary-output-buffer* into consideration"
@@ -178,8 +178,38 @@ will take the variable *try-use-temporary-output-buffer* into consideration"
           (error e))))))
 
 
+(declaim (inline dispatch))
 (defun uncompress-git-file (filename)
+  (let ((binary (read-binary-file filename)))
+    ;; try to guess which version to use
+    ;; TODO: remove NOT as soon as cffi implementation is ready
+    (if (not git-api.zlib.cffi:*zlib-loaded*)
+        ;; first try CFFI version as the fastest
+        (uncompress-git-file-cffi binary)
+        (uncompress-git-file-zlib binary))))
+
+
+
+(defun uncompress-git-file-zlib (data)
   ;;          (with-open-file (stream filename :direction :input :element-type '(unsigned-byte 8))
   ;;                 (chipz:decompress nil 'chipz:zlib stream)))
-  (zlib:uncompress (read-binary-file filename)))
+  (zlib:uncompress data))
   
+
+(defun uncompress-git-file-cffi (data)
+  (let ((stream-size (cffi:foreign-type-size '(:struct z-stream))))
+    ;; create a stream struct
+    (cffi:with-foreign-object (strm '(:struct z-stream))
+      ;; clear the stream struct
+;      (foreign-funcall "memset" :pointer strm :int 0 :int stream-size)
+;      (foreign-funcall "memset" :pointer strm :int 0 :int stream-size)
+      ;; initalize values in struct
+      (cffi:with-foreign-slots ((next-in avail-in next-out avail-out) strm (:struct z-stream))
+        (setf next-in data
+              avail-in (length data)
+              next-out nil; buf
+              avail-out uncompressed-size))
+      ;; initialize the stream
+      (inflate-init_ strm (zlib-version) stream-size)
+      (inflate strm +z-finish+)
+      (inflate-end strm))))
