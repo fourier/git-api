@@ -5,7 +5,8 @@
 (defpackage #:git-api.zlib.wrapper
   (:use #:cl #:alexandria #:git-api.utils #:static-vectors)
   (:export *try-use-temporary-output-buffer*
-   uncompress-stream))
+   uncompress-stream
+   uncompress-git-file))
 
 (in-package #:git-api.zlib.wrapper)
 
@@ -175,3 +176,10 @@ will take the variable *try-use-temporary-output-buffer* into consideration"
           (unless (eq output *temporary-static-output-buffer*)
             (free-static-vector output))
           (error e))))))
+
+
+(defun uncompress-git-file (filename)
+  ;;          (with-open-file (stream filename :direction :input :element-type '(unsigned-byte 8))
+  ;;                 (chipz:decompress nil 'chipz:zlib stream)))
+  (zlib:uncompress (read-binary-file filename)))
+  

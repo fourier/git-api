@@ -140,10 +140,7 @@
 (defun parse-git-file (filename)
   (declare (optimize speed))
   (let* ((data
-          ;; TODO: use zlib-wrapper
-;;          (with-open-file (stream filename :direction :input :element-type '(unsigned-byte 8))
-;;                 (chipz:decompress nil 'chipz:zlib stream)))
-          (zlib:uncompress (read-binary-file filename)))
+          (git-api.zlib.wrapper:uncompress-git-file filename))
          (content-start (position 0 data))
          (header 
           (babel:octets-to-string data :start 0 :end content-start
