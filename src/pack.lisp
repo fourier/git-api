@@ -11,7 +11,7 @@
 ;; read the source: https://github.com/git/git/blob/master/pack-write.c
 ;;
 (defpackage #:git-api.pack
-  (:use #:cl #:alexandria #:git-api.utils #:git-api.pack.get-data)
+  (:use #:cl #:alexandria #:git-api.utils #:git-api.zlib.wrapper)
   (:export
    pack-open-stream
    pack-close-stream

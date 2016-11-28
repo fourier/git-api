@@ -32,8 +32,8 @@
   :components ((:module "src"
                 :components
                 ((:file "utils")
+                 (:file "zlib-cffi")
                  (:file "zlib-wrapper")
-                 (:file "pack-get-data")
                  (:file "pack")
                  (:file "object")
                  (:file "repo"))))
