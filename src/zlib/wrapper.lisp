@@ -47,9 +47,12 @@ be returned if the uncompressed data size is less than +buffer-size+ and
 if the variable *try-use-temporary-output-buffer* is T.
 This buffer is used with CFFI version of zlib")  
   
+(defparameter *git-object-header-static-buffer* (make-static-vector 32))
+
 
 (defvar *uncompressed-size-ptr* (cffi:foreign-alloc :unsigned-long)
   "A pointer to the uncompressed size used by CFFI zlib uncompress function")
+
 
 (declaim (inline dispatch))
 (defun uncompress-stream (offset compressed-size uncompressed-size stream)
@@ -180,36 +183,56 @@ will take the variable *try-use-temporary-output-buffer* into consideration"
 
 (declaim (inline dispatch))
 (defun uncompress-git-file (filename)
-  (let ((binary (read-binary-file filename)))
-    ;; try to guess which version to use
-    (fixme "remove NOT as soon as cffi implementation is ready")
-    (if (not git-api.zlib.cffi:*zlib-loaded*)
-        ;; first try CFFI version as the fastest
-        (uncompress-git-file-cffi binary)
-        (uncompress-git-file-zlib binary))))
+  ;; try to guess which version to use
+  (fixme "remove NOT as soon as cffi implementation is ready")
+  (if (not git-api.zlib.cffi:*zlib-loaded*)
+      ;; first try CFFI version as the fastest
+      (uncompress-git-file-cffi filename)
+      (uncompress-git-file-zlib filename)))
 
 
 
-(defun uncompress-git-file-zlib (data)
+(defun uncompress-git-file-zlib (filename)
   ;;          (with-open-file (stream filename :direction :input :element-type '(unsigned-byte 8))
   ;;                 (chipz:decompress nil 'chipz:zlib stream)))
-  (zlib:uncompress data))
+  (let ((data (read-binary-file filename)))
+    (zlib:uncompress data)))
   
 
-(defun uncompress-git-file-cffi (data)
-  (let ((stream-size (cffi:foreign-type-size '(:struct z-stream))))
-    ;; create a stream struct
-    (cffi:with-foreign-object (strm '(:struct z-stream))
-      ;; clear the stream struct
-;      (foreign-funcall "memset" :pointer strm :int 0 :int stream-size)
-;      (foreign-funcall "memset" :pointer strm :int 0 :int stream-size)
-      ;; initalize values in struct
-      (cffi:with-foreign-slots ((next-in avail-in next-out avail-out) strm (:struct z-stream))
-        (setf next-in data
-              avail-in (length data)
-              next-out nil; buf
-              avail-out uncompressed-size))
-      ;; initialize the stream
-      (inflate-init_ strm (zlib-version) stream-size)
-      (inflate strm +z-finish+)
-      (inflate-end strm))))
+(defun print-zstream (zstrm &optional (out-stream *standard-output*))
+  (cffi:with-foreign-slots ((next-in avail-in next-out avail-out total-in total-out) zstrm (:struct z-stream))
+    (format out-stream "zstream.next_in = 0x~X~%" (cffi-sys:pointer-address next-in))
+    (format out-stream "zstream.avail_in = ~a~%" avail-in)
+    (format out-stream "zstream.total_in = ~a~%" total-in)
+    (format out-stream "zstream.next_out = 0x~X~%" (cffi-sys:pointer-address next-out))
+    (format out-stream "zstream.avail_out = ~a~%" avail-out)
+    (format out-stream "zstream.total_out = ~a~%" total-out)))
+
+
+(defun uncompress-git-file-cffi (filename)
+  ;; open the stream and read the file contents into the static vector
+  (with-open-file (stream filename :direction :input :element-type '(unsigned-byte 8))
+    (let ((size (file-length stream)))
+      (with-static-vector (input size)
+        (read-sequence input stream)
+        ;; create a stream struct
+        (cffi:with-foreign-object (strm '(:struct z-stream))
+          ;; clear the stream struct
+          (memset strm 0 +z-stream-size+)
+          ;; initalize values in struct
+          (cffi:with-foreign-slots ((next-in avail-in next-out avail-out) strm (:struct z-stream))
+            (setf next-in (static-vector-pointer input)
+                  avail-in 64 ; read no more than 64 bytes - it is enough to read a header
+                  next-out (static-vector-pointer *git-object-header-static-buffer*)
+                  ;; header assumed to be is no more than 32 bytes, at least in Git implementation it is
+                  avail-out 32)
+            (print-zstream strm)
+            ;; initialize the stream
+            (print (inflate-init_ strm (zlib-version) +z-stream-size+))
+            (print-zstream strm)
+            (unwind-protect
+                (progn
+                  (todo "No error handling")
+                  (inflate strm +z-finish+)
+                  (print-zstream strm)
+              (inflate-end strm)))))))))

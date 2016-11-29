@@ -14,7 +14,8 @@
    inflate
    inflate-end
    memset
-   next-in avail-in next-out avail-out
+   next-in avail-in next-out avail-out total-in total-out
+   +z-stream-size+
    +z-finish+ +z-ok+ +z-stream-end+))
 
 (in-package #:git-api.zlib.cffi)
@@ -33,6 +34,10 @@
 (ignore-errors 
   (use-foreign-library zlib)
   (setf *zlib-loaded* t))
+
+(defparameter +z-stream-size+
+  (if *zlib-loaded* (cffi:foreign-type-size '(:struct z-stream)) 0)
+  "The size of z-stream structure. If zlib is not available then 0")
 
 ;;----------------------------------------------------------------------------
 ;; Constants 
