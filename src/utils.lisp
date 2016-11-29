@@ -4,7 +4,9 @@
   (:export
    from
    read-one-line
-   file-size
+   compiler-warning
+   fixme
+   todo   file-size
    read-binary-file
    read-header
    sha1-to-hex
@@ -56,6 +58,19 @@ In the last example imports all the exported symbols from the package given."
   (let ((stream-var (gensym)))
     `(with-open-file (,stream-var ,filename :direction :input)
        (read-line ,stream-var))))
+
+
+(defmacro compiler-warning (datum &rest arguments)
+  "Issue the compiler warning"
+  (apply 'warn datum arguments))
+
+(defmacro fixme (datum &rest arguments)
+  "Issue the compiler warning starting with FIXME: string"
+  (apply 'warn (concatenate 'string "FIXME: " datum) arguments))
+
+(defmacro todo (datum &rest arguments)
+  "Issue the compiler warning starting with TODO: string"
+  (apply 'warn (concatenate 'string "TODO: " datum) arguments))
 
 
 ;;----------------------------------------------------------------------------

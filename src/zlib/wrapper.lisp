@@ -182,7 +182,7 @@ will take the variable *try-use-temporary-output-buffer* into consideration"
 (defun uncompress-git-file (filename)
   (let ((binary (read-binary-file filename)))
     ;; try to guess which version to use
-    ;; TODO: remove NOT as soon as cffi implementation is ready
+    (fixme "remove NOT as soon as cffi implementation is ready")
     (if (not git-api.zlib.cffi:*zlib-loaded*)
         ;; first try CFFI version as the fastest
         (uncompress-git-file-cffi binary)
