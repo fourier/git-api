@@ -1,4 +1,4 @@
-;;;; zlib-cffi.lisp
+;;;; cffi.lisp
 ;;
 ;; CFFI bindings to zlib
 ;; also exports auxulary cffi functions like memset

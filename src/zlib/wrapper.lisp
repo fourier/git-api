@@ -1,4 +1,4 @@
-;;;; zlib-wrapper.lisp
+;;;; wrapper.lisp
 ;;
 ;; This package reads the compressed entry from the pack file
 ;;

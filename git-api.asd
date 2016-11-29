@@ -30,10 +30,15 @@
                #:flexi-streams  ; to create in-memory streams - BSD
                #:ironclad)      ; sha1 checksum - X11/MIT-like license
   :components ((:module "src"
+                :serial t
                 :components
                 ((:file "utils")
-                 (:file "zlib-cffi")
-                 (:file "zlib-wrapper")
+                 (:module "zlib"
+                          :depends-on ("utils")
+                          :serial t
+                          :components
+                          ((:file "cffi")
+                           (:file "wrapper")))
                  (:file "pack")
                  (:file "object")
                  (:file "repo"))))
