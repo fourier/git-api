@@ -72,6 +72,31 @@ In the last example imports all the exported symbols from the package given."
   "Issue the compiler warning starting with TODO: string"
   (apply 'warn (concatenate 'string "TODO: " datum) arguments))
 
+(defmacro defpkg (name &rest options)
+  (let* ((options1 (copy-list options))
+         (use (find-if (lambda (arg) (eq (car arg) :use)) options))
+         ;; prepare a package name prefixed with "git-api"
+         (pkg-name (intern
+                    (string-upcase
+                     (concatenate 'string "git-api."
+                                  (string-downcase (symbol-name name))))
+                    "KEYWORD")))
+    (when use
+      ;; remove use statement from original options list,
+      ;; we will re-construct it
+      (removef options1 use)
+      ;; remove heading :use
+      (setf use (cdr use))
+      (print use))
+    ;; reconstruct new :use
+    (pushnew ':git-api.utils use)
+    (pushnew ':alexandria use)
+    (pushnew ':cl use)
+    (push ':use use)
+    (push use options1)
+    ;; finally create a package
+   `(defpackage ,pkg-name ,@options1)))
+
 
 ;;----------------------------------------------------------------------------
 ;; Utility functions

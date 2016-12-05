@@ -16,7 +16,7 @@
    memset
    next-in avail-in next-out avail-out total-in total-out
    +z-stream-size+
-   +z-finish+ +z-ok+ +z-stream-end+))
+   +z-finish+ +z-ok+ +z-stream-end+ +z-buf-error+))
 
 (in-package #:git-api.zlib.cffi)
 

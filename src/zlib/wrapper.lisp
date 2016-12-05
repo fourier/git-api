@@ -54,6 +54,16 @@ This buffer is used with CFFI version of zlib")
   "A pointer to the uncompressed size used by CFFI zlib uncompress function")
 
 
+(define-condition zlib-error (error)
+  ((text :initarg :text))
+  (:report (lambda (condition stream)
+             (format stream "zlib error: ~a" (slot-value condition 'text)))))
+
+
+(defun raise (error-text &rest args)
+  "Raises the zlib-error condition with the format text ERROR-TEXT and format ARGS"
+  (error 'zlib-error :text (apply #'format error-text args)))
+
 (declaim (inline dispatch))
 (defun uncompress-stream (offset compressed-size uncompressed-size stream)
   ;; try to guess which version to use
@@ -206,13 +216,56 @@ will take the variable *try-use-temporary-output-buffer* into consideration"
     (format out-stream "zstream.total_in = ~a~%" total-in)
     (format out-stream "zstream.next_out = 0x~X~%" (cffi-sys:pointer-address next-out))
     (format out-stream "zstream.avail_out = ~a~%" avail-out)
-    (format out-stream "zstream.total_out = ~a~%" total-out)))
+    (format out-stream "zstream.total_out = ~a~%~%" total-out)))
 
 
+(defun copy-static-vector (static-vector normal-vector size)
+  (loop for i from 0 below size
+        for val = (the (unsigned-byte 8)
+                       (cffi:mem-aref (static-vector-pointer static-vector) :unsigned-char i))
+        do (setf (aref normal-vector i) val))
+  normal-vector)
+
+
+(defmacro unless-result-is (binding &body forms)
+  "Defines a binding for numeric value returned by the second argument in BINDING.
+The binding is the local variable named RESULT.
+Examples:
+For single case:
+(unless (+ok+ (inflate-init_ strm (zlib-version) +z-stream-size+))
+  (raise \"inflate-init error: result is ~d\" result)
+
+For multiple cases: 
+(unless-result-is ((0 1 2) (inflate-init_ strm (zlib-version) +z-stream-size+))
+  (raise \"inflate-init error: result is ~d\" result))"
+  (unless (= (length binding) 2)   ; 2 arguments possible
+    (error "2 arguments must be supplied - expected result[s] and a form"))
+  (let* ((bindings (if (atom (car binding))
+                       (list (car binding))
+                       (car binding))))
+    `(let ((result ,(cadr binding)))
+       (unless (or ,@(mapcar (lambda (x) `(= result ,x)) bindings))
+       ,@forms))))
+
+                        
 (defun uncompress-git-file-cffi (filename)
+  "Uncompress the git object file"
+  ;; Git object format:
+  ;; header\0(content)
+  ;; where the header is: {type string}#\Space{content size string}
+  ;; From this the uncompressed size is (header size) + 1 + (content size)
+  ;; Algorithm:
+  ;; 1. Read up to 32 bytes of output buffer
+  ;; 2. Parse the input
+  ;; 3. If content size <= 32 - (header size + 1)
+  ;;    meaning it fit completely into the 32 bytes, just return the result
+  ;; 4. Otherwise if content size < 8192 - (header size + 1)
+  ;;    meaning we can use pre-allocated buffer - use it
+  ;; 5. Otherwise allocate the buffer of the size (header size + 1 + content size) and use it
   ;; open the stream and read the file contents into the static vector
   (with-open-file (stream filename :direction :input :element-type '(unsigned-byte 8))
-    (let ((size (file-length stream)))
+    (let ((size (file-length stream))
+          (content))
       (with-static-vector (input size)
         (read-sequence input stream)
         ;; create a stream struct
@@ -220,19 +273,68 @@ will take the variable *try-use-temporary-output-buffer* into consideration"
           ;; clear the stream struct
           (memset strm 0 +z-stream-size+)
           ;; initalize values in struct
-          (cffi:with-foreign-slots ((next-in avail-in next-out avail-out) strm (:struct z-stream))
+          (cffi:with-foreign-slots ((next-in avail-in next-out avail-out total-in total-out)
+                                    strm (:struct z-stream))
             (setf next-in (static-vector-pointer input)
-                  avail-in 64 ; read no more than 64 bytes - it is enough to read a header
+                  avail-in (min 64 size) ; read no more than 64 bytes - it is enough to read a header
                   next-out (static-vector-pointer *git-object-header-static-buffer*)
-                  ;; header assumed to be is no more than 32 bytes, at least in Git implementation it is
+                  ;; header assumed to be is no more than 32 bytes,
+                  ;; at least in Git implementation itself it is the assumption
                   avail-out 32)
             (print-zstream strm)
             ;; initialize the stream
-            (print (inflate-init_ strm (zlib-version) +z-stream-size+))
-            (print-zstream strm)
+            (unless-result-is (+z-ok+ (inflate-init_ strm (zlib-version) +z-stream-size+))
+              (raise "zlib inflate-init returned ~d" result))
             (unwind-protect
-                (progn
-                  (todo "No error handling")
-                  (inflate strm +z-finish+)
-                  (print-zstream strm)
-              (inflate-end strm)))))))))
+                (block inflate-stream
+                  (let ((result (inflate strm +z-finish+)))
+                    (unless (or (= result +z-stream-end+)
+                                (= result +z-buf-error+)
+                                (= result +z-ok+))
+                      (raise "zlib inflate returned ~d" result))
+                    (print-zstream strm)
+                    ;; when we have uncompressed everything, meaning
+                    ;; header + size <= 32 bytes,
+                    ;; just return result as a copy of static buffer
+                    (when (= result +z-stream-end+)
+                      (setf content (make-array total-out :element-type '(unsigned-byte 8)))
+                      (copy-static-vector *git-object-header-static-buffer*
+                                          content
+                                          total-out)
+                      (return-from inflate-stream)))
+                        ;; find the end of header with type and size
+                  (let* ((header-size (position 0 *git-object-header-static-buffer*))
+                         (header (split-sequence:split-sequence
+                                  #\Space
+                                  (babel:octets-to-string *git-object-header-static-buffer*
+                                                          :end header-size :encoding :utf-8)))
+                         ;; extract the size
+                         (content-size (parse-integer (cadr header)))
+                         (uncompressed-size (+ 1 header-size content-size)))
+                    ;; finally allocate static vector to uncompress the rest of the data                                        
+                    (with-static-vector (static-content uncompressed-size)
+                      (format t "total uncompressed size: ~d~%" uncompressed-size)
+                      (inflate-end strm)
+                      ;; clear the stream again
+                      (memset strm 0 +z-stream-size+)
+                      ;; update stream with the rest of the data
+                      (setf avail-in size
+                            next-in (static-vector-pointer input)
+                            avail-out uncompressed-size
+                            next-out (static-vector-pointer static-content))
+                      (print-zstream strm)
+                      (inflate-init_ strm (zlib-version) +z-stream-size+)
+                      ;; and finally uncompress the rest
+                      (print (inflate strm +z-finish+))
+                      ;; (
+                      (setf content (make-array uncompressed-size
+                                                :element-type '(unsigned-byte 8)))
+                      (loop for i from 0 below uncompressed-size
+                            for val = (the (unsigned-byte 8)
+                                           (cffi:mem-aref (static-vector-pointer static-content) :unsigned-char i))
+                            do (setf (aref content i) val))
+                      (print-zstream strm))))
+              (inflate-end strm)))))
+      content)))
+
+

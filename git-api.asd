@@ -30,7 +30,6 @@
                #:flexi-streams  ; to create in-memory streams - BSD
                #:ironclad)      ; sha1 checksum - X11/MIT-like license
   :components ((:module "src"
-                :serial t
                 :components
                 ((:file "utils")
                  (:module "zlib"
@@ -39,9 +38,9 @@
                           :components
                           ((:file "cffi")
                            (:file "wrapper")))
-                 (:file "pack")
-                 (:file "object")
-                 (:file "repo"))))
+                 (:file "pack" :depends-on ("utils" "zlib"))
+                 (:file "object" :depends-on ("utils" "zlib"))
+                 (:file "repo" :depends-on ("utils" "pack" "object")))))
   :description "Library for accessing git repository"
   :long-description
   #.(with-open-file (stream (merge-pathnames
