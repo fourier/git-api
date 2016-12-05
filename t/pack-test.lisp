@@ -485,15 +485,8 @@ command in the t/data/example-repo/objects/pack directory")
              (cdr tables))))
 
 
-
-(subtest "Test of the parse-pack-file and creation of instances of pack-file object"
-  (let ((blob-obj
-         (read-file-into-string (testfile "example-repo-extracted/dee95d63ff98bc1b1ef6e26ae7d83eb40d653d3e.contents")))
-        (delta-obj
-         (read-file-into-string (testfile "example-repo-extracted/9eeff76aaa278e9253b0106dfab6b8ab2619d695.contents")))
-        (pack
-         (parse-pack-file
-          (namestring (testfile "example-repo/objects/pack/pack-559f5160ab63a074f365f538d209164b5d8a715a.pack")))))
+(defun test-parse-pack-file (blob-obj delta-obj pack subtest-name)
+  (subtest subtest-name
     (is-type pack 'pack-file "Test if parse-pack-file returned instance of type pack-file")
     ;; check what pack-open-stream works and do not fail on double calls
     (pack-close-stream pack)
@@ -510,7 +503,19 @@ command in the t/data/example-repo/objects/pack directory")
     (is delta-obj
         (babel:octets-to-string (pack-get-object-by-hash pack "9eeff76aaa278e9253b0106dfab6b8ab2619d695"))
         "Test of pack-get-object-by-hash for delta object")))
-     
+  
+
+(subtest "Test of the parse-pack-file and creation of instances of pack-file object"
+  (let ((blob-obj
+         (read-file-into-string (testfile "example-repo-extracted/dee95d63ff98bc1b1ef6e26ae7d83eb40d653d3e.contents")))
+        (delta-obj
+         (read-file-into-string (testfile "example-repo-extracted/9eeff76aaa278e9253b0106dfab6b8ab2619d695.contents")))
+        (pack
+         (parse-pack-file
+          (namestring (testfile "example-repo/objects/pack/pack-559f5160ab63a074f365f538d209164b5d8a715a.pack")))))
+    (test-parse-pack-file blob-obj delta-obj pack "Test with default CFFI zlib(or default)")
+    (let ((git-api.zlib.cffi:*zlib-loaded* nil))
+      (test-parse-pack-file blob-obj delta-obj pack "Test with CL zlib"))))
 
 
 (finalize)
