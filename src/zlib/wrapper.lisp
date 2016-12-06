@@ -215,26 +215,23 @@ will take the variable *try-use-temporary-output-buffer* into consideration"
           ;; read the data
           (read-sequence input stream :end compressed-size)
           ;; uncompress chunk
-          (let ((foreign-output (static-vector-pointer output)))
-            ;; check for error
-            (unless-result-is (0 (git-api.zlib.cffi:uncompress
-                                  foreign-output
-                                  *uncompressed-size-ptr*
-                                  (static-vector-pointer input)
-                                  compressed-size))
-              (raise "zlib::uncompress returned ~d" result))
-            ;; if necessary convert data from C to LISP format
-            (unless (eq output-buffer *temporary-static-output-buffer*)
-              (loop for i from 0 below uncompressed-size
-                    for val = (the (unsigned-byte 8) (cffi:mem-aref foreign-output :unsigned-char i))
-                    do (setf (aref output-buffer i) val)))
-            ;; if necessary remove foreign arrays
-            (unless (eq input *temporary-static-read-buffer*)
-              (free-static-vector input))
-            (unless (eq output *temporary-static-output-buffer*)
-              (free-static-vector output))
-            ;; good, output buffer now contains the data
-            output-buffer))
+          ;; check for error
+          (unless-result-is (0 (git-api.zlib.cffi:uncompress
+                                (static-vector-pointer output)
+                                *uncompressed-size-ptr*
+                                (static-vector-pointer input)
+                                compressed-size))
+            (raise "zlib::uncompress returned ~d" result))
+          ;; if necessary convert data from C to LISP format
+          (unless (eq output-buffer *temporary-static-output-buffer*)
+            (copy-static-vector output output-buffer uncompressed-size))
+          ;; if necessary remove foreign arrays
+          (unless (eq input *temporary-static-read-buffer*)
+            (free-static-vector input))
+          (unless (eq output *temporary-static-output-buffer*)
+            (free-static-vector output))
+          ;; good, output buffer now contains the data
+          output-buffer)
       (error (e)
         (progn
           ;; if necessary remove foreign arrays
