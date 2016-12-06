@@ -255,7 +255,19 @@ to the CL zlib"
         do (setf (aref normal-vector offset) val))
   normal-vector)
 
-                        
+;; wrap in macro
+;; args: name, size, temporary
+(defmacro with-temp-static-array ((array size temp-array) &body body)
+  `(let ((,array 
+         (if (or (not *try-use-temporary-output-buffer*) (> ,size +buffer-size+))
+             (make-static-vector ,size)
+             ,temp-array)))
+    (unwind-protect
+        ,@body
+      (unless (eq ,array ,temp-array)
+        (free-static-vector ,array)))))
+
+
 (defun uncompress-git-file-cffi (filename)
   "Uncompress the git object file using C-version of ZLIB"
   ;; Git object format:
@@ -274,7 +286,7 @@ to the CL zlib"
   (with-open-file (stream filename :direction :input :element-type '(unsigned-byte 8))
     (let ((size (file-length stream))
           (content))
-      (with-static-vector (input size)
+      (with-temp-static-array (input size *temporary-static-read-buffer*)
         (read-sequence input stream)
         ;; create a stream struct
         (cffi:with-foreign-object (strm '(:struct z-stream))
@@ -321,7 +333,7 @@ to the CL zlib"
                     ;; the static vector size is at maximum content-size,
                     ;; but could be (typically) less since parts of content was already
                     ;; uncompressed to the *git-object-header-static-buffer*
-                    (with-static-vector (static-content content-size)
+                    (with-temp-static-array (static-content content-size *temporary-static-output-buffer*)
                       ;; update stream with the rest of the data
                       (setf avail-in (- size avail-in)
                             avail-out content-size
