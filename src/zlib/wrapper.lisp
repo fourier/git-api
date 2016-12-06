@@ -85,12 +85,43 @@ For multiple cases:
        ,@forms))))
 
 
+(defmacro with-temp-static-array ((array size temp-array) &body body)
+  "Similar to with-static-array, but tries to use temproray buffer temp-array
+if the size < +buffer-size+"
+  `(let ((,array 
+         (if (or (not *try-use-temporary-output-buffer*) (> ,size +buffer-size+))
+             (make-static-vector ,size)
+             ,temp-array)))
+    (unwind-protect
+        ,@body
+      (unless (eq ,array ,temp-array)
+        (free-static-vector ,array)))))
+
+
 (defun raise (error-text &rest args)
   "Raises the zlib-error condition with the format text ERROR-TEXT and format ARGS"
   (error 'zlib-error :text (apply #'format error-text args)))
 
+
+(declaim (inline copy-static-vector))
+(defun copy-static-vector (static-vector normal-vector size &key (input-offset 0) (output-offset 0) )
+  "Copy the SIZE bytes from static vector STATIC-VECTOR to the lisp vector of type (unsigned-byte 8)
+NORMAL-VECTOR starting in source vector from INPUT-OFFSET and into the OUTPUT-OFFSET of the
+destination vector"
+  (declare (optimize (speed 3) (safety 0) (debug 0) (float 0)))
+  (loop for i from input-offset below (+ size input-offset)
+        for offset = (+ i output-offset)
+        for val = (the (unsigned-byte 8)
+                       (cffi:mem-aref (static-vector-pointer static-vector) :unsigned-char i))
+        do (setf (aref normal-vector offset) val))
+  normal-vector)
+
+
 (declaim (inline uncompress-stream))
 (defun uncompress-stream (offset compressed-size uncompressed-size stream)
+  "Return the zlib-uncompressed data for the stream starting with position OFFSET
+reading COMPRESSED-SIZE bytes and assuming uncompressed data is of size
+UNCOMPRESSED-SIZE bytes. This shoud be known in advance before using the function"
   ;; try to guess which version to use
   (cond
    ;; first try CFFI version as the fastest
@@ -245,29 +276,6 @@ to the CL zlib"
     (format out-stream "zstream.total_out = ~a~%~%" total-out)))
 
 
-(declaim (inline copy-static-vector))
-(defun copy-static-vector (static-vector normal-vector size &key (offset-output 0))
-  (declare (optimize (speed 3) (safety 0) (debug 0) (float 0)))
-  (loop for i from 0 below size
-        for offset = (+ i offset-output)
-        for val = (the (unsigned-byte 8)
-                       (cffi:mem-aref (static-vector-pointer static-vector) :unsigned-char i))
-        do (setf (aref normal-vector offset) val))
-  normal-vector)
-
-;; wrap in macro
-;; args: name, size, temporary
-(defmacro with-temp-static-array ((array size temp-array) &body body)
-  `(let ((,array 
-         (if (or (not *try-use-temporary-output-buffer*) (> ,size +buffer-size+))
-             (make-static-vector ,size)
-             ,temp-array)))
-    (unwind-protect
-        ,@body
-      (unless (eq ,array ,temp-array)
-        (free-static-vector ,array)))))
-
-
 (defun uncompress-git-file-cffi (filename)
   "Uncompress the git object file using C-version of ZLIB"
   ;; Git object format:
@@ -352,7 +360,7 @@ to the CL zlib"
                       (copy-static-vector static-content
                                           content
                                           (- uncompressed-size +git-object-header-size+)
-                                          :offset-output +git-object-header-size+))))
+                                          :output-offset +git-object-header-size+))))
               (inflate-end strm)))))
       content)))
 
