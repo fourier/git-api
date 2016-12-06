@@ -64,6 +64,27 @@ This buffer is used with CFFI version of zlib")
              (format stream "zlib error: ~a" (slot-value condition 'text)))))
 
 
+(defmacro unless-result-is (binding &body forms)
+  "Defines a binding for numeric value returned by the second argument in BINDING.
+The binding is the local variable named RESULT.
+Examples:
+For single case:
+(unless (+ok+ (inflate-init_ strm (zlib-version) +z-stream-size+))
+  (raise \"inflate-init error: result is ~d\" result)
+
+For multiple cases: 
+(unless-result-is ((0 1 2) (inflate-init_ strm (zlib-version) +z-stream-size+))
+  (raise \"inflate-init error: result is ~d\" result))"
+  (unless (= (length binding) 2)   ; 2 arguments possible
+    (error "2 arguments must be supplied - expected result[s] and a form"))
+  (let* ((bindings (if (atom (car binding))
+                       (list (car binding))
+                       (car binding))))
+    `(let ((result ,(cadr binding)))
+       (unless (or ,@(mapcar (lambda (x) `(= result ,x)) bindings))
+       ,@forms))))
+
+
 (defun raise (error-text &rest args)
   "Raises the zlib-error condition with the format text ERROR-TEXT and format ARGS"
   (error 'zlib-error :text (apply #'format error-text args)))
@@ -163,16 +184,14 @@ will take the variable *try-use-temporary-output-buffer* into consideration"
           ;; read the data
           (read-sequence input stream :end compressed-size)
           ;; uncompress chunk
-          (let* ((foreign-output (static-vector-pointer output))
-                 (result
-                  (git-api.zlib.cffi:uncompress
-                   foreign-output
-                   *uncompressed-size-ptr*
-                   (static-vector-pointer input)
-                   compressed-size)))
+          (let ((foreign-output (static-vector-pointer output)))
             ;; check for error
-            (unless (= result 0)
-              (error (format nil "zlib::uncompress returned ~d" result)))
+            (unless-result-is (0 (git-api.zlib.cffi:uncompress
+                                  foreign-output
+                                  *uncompressed-size-ptr*
+                                  (static-vector-pointer input)
+                                  compressed-size))
+              (raise "zlib::uncompress returned ~d" result))
             ;; if necessary convert data from C to LISP format
             (unless (eq output-buffer *temporary-static-output-buffer*)
               (loop for i from 0 below uncompressed-size
@@ -225,6 +244,7 @@ to the CL zlib"
     (format out-stream "zstream.avail_out = ~a~%" avail-out)
     (format out-stream "zstream.total_out = ~a~%~%" total-out)))
 
+
 (declaim (inline copy-static-vector))
 (defun copy-static-vector (static-vector normal-vector size &key (offset-output 0))
   (declare (optimize (speed 3) (safety 0) (debug 0) (float 0)))
@@ -234,27 +254,6 @@ to the CL zlib"
                        (cffi:mem-aref (static-vector-pointer static-vector) :unsigned-char i))
         do (setf (aref normal-vector offset) val))
   normal-vector)
-
-
-(defmacro unless-result-is (binding &body forms)
-  "Defines a binding for numeric value returned by the second argument in BINDING.
-The binding is the local variable named RESULT.
-Examples:
-For single case:
-(unless (+ok+ (inflate-init_ strm (zlib-version) +z-stream-size+))
-  (raise \"inflate-init error: result is ~d\" result)
-
-For multiple cases: 
-(unless-result-is ((0 1 2) (inflate-init_ strm (zlib-version) +z-stream-size+))
-  (raise \"inflate-init error: result is ~d\" result))"
-  (unless (= (length binding) 2)   ; 2 arguments possible
-    (error "2 arguments must be supplied - expected result[s] and a form"))
-  (let* ((bindings (if (atom (car binding))
-                       (list (car binding))
-                       (car binding))))
-    `(let ((result ,(cadr binding)))
-       (unless (or ,@(mapcar (lambda (x) `(= result ,x)) bindings))
-       ,@forms))))
 
                         
 (defun uncompress-git-file-cffi (filename)
