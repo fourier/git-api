@@ -314,12 +314,10 @@ to the CL zlib"
                                           total-out)
                       ;; otherwise find the end of the header with type and size
                       (let* ((header-size (position 0 *git-object-header-static-buffer*))
-                             (header (split-sequence:split-sequence
-                                      #\Space
-                                      (babel:octets-to-string *git-object-header-static-buffer*
-                                                              :end header-size :encoding :utf-8)))
-                             ;; extract the size
-                             (content-size (parse-integer (cadr header)))
+                             (content-size (parse-integer
+                                            (babel:octets-to-string *git-object-header-static-buffer*
+                                                                    :start (1+ (position 32 *git-object-header-static-buffer*))
+                                                                    :end header-size)))
                              (uncompressed-size (+ 1 header-size content-size)))
                         ;; finally allocate static vector to uncompress the rest of the data
                         ;; the static vector size is at maximum content-size,
