@@ -48,7 +48,7 @@
 ;;----------------------------------------------------------------------------
 (defclass commit (git-object)
   ((tree :initarg :tree :reader commit-tree :initform "" :type simple-string
-         :documentation "SHA1-hash of the associated tree object")
+         :documentation "SHA1-hash string of the associated tree object")
    (author :initarg :author :reader commit-author :initform "" :type simple-string
            :documentation "String representing commit author field")
    (committer :initarg :committer :reader commit-committer :initform "" :type simple-string
@@ -138,6 +138,9 @@
 ;; Exported functions
 ;;----------------------------------------------------------------------------
 (defun parse-git-file (filename)
+  "Parse the git file (inside .git/objects/ directory) pointed by the
+FILENAME.
+Returns the parsed git object - COMMIT, TAG, TREE or BLOB"
   (declare (optimize speed))
   (let* ((data
           (git-api.zlib.wrapper:uncompress-git-file filename))
@@ -156,11 +159,12 @@
                       :start (1+ content-start)
                       :size (parse-integer len))))
 
-(defgeneric parse-git-object (type data hash &key start size))
-
-(defmethod parse-git-object ((obj (eql :blob)) data hash &key start size)
-  (let ((blob (make-instance 'blob :hash hash :content (subseq data start (+ start size)))))
-    blob))
+(defgeneric parse-git-object (type data hash &key start size)
+  (:documentation "Parses the git object in DATA byte array starting from position START
+of size SIZE.
+TYPE is one of keywords: :COMMIT, :TAG, :TREE or :BLOB.
+HASH is the 40-characters hex SHA1 string identifying the object.
+Returns the parsed git object - COMMIT, TAG, TREE or BLOB"))
 
 
 ;;----------------------------------------------------------------------------
@@ -172,11 +176,10 @@ and returns a PAIR:
   (car PAIR) = list of lines before the comment
   (cdr PAIR) = comment"
   (declare (optimize (speed 3) (safety 0) (debug 0)))
-  (declare (type simple-string text header comment))
-  (declare (type fixnum start size last-char-pos newline-position))
+  (declare (type fixnum start size))
   (let* ((text (babel:octets-to-string data
                                        :start start
-                                       :end (+ start size)
+                                       :end (the fixnum (+ start size))
                                        :errorp nil
                                        :encoding :utf-8))
          (text-length (the fixnum (length text)))
@@ -190,17 +193,24 @@ and returns a PAIR:
           (if (>= newline-position (- text-length 2))
               ""
               (subseq text (+ 2 newline-position)))))
-    (declare (type string text header comment)
+    (declare (type string text comment)
+             (type simple-string header)
              (type fixnum text-length newline-position))
     (cons (split-sequence:split-sequence #\newline header)
           comment)))
+
+
+(defmethod parse-git-object ((obj (eql :blob)) data hash &key start size)
+  "Parses the git object of type BLOB"
+  (let ((blob (make-instance 'blob :hash hash :content (subseq data start (+ start size)))))
+    blob))
 
 
 (defun find-consecutive-newlines (str &key (first 0) (last (length str)))
   "Find 2 consecutive newlines in the string STR.
 Returns the index of the first element found or size of STR if
 nothing found"
-  (declare (type string str)
+  (declare (type simple-string str)
            (type fixnum first last))
   (declare (optimize (speed 3) (safety 0) (debug 0)))
   (if (/= first last)
@@ -217,14 +227,14 @@ nothing found"
 
 
 (defmethod parse-git-object ((obj (eql :commit)) data hash &key start size)
+  "Parses the git object of type COMMIT"
   (let* ((parsed-data (parse-text-git-data data start size))
          (commit (make-instance 'commit :hash hash :comment (cdr parsed-data))))
     (with-slots (tree author committer parents) commit
       (dolist (line (car parsed-data))
         (let* ((space-pos (position #\Space line))
-               (key (subseq line 0 space-pos))
                (value (subseq line (1+ space-pos))))
-          (switch (key :test #'string=)
+          (switch (line :test (lambda (x y) (string= x y :end1 space-pos)))
             ("tree" (setf tree value))
             ("author" (setf author value))
             ("committer" (setf committer value))
@@ -234,6 +244,7 @@ nothing found"
 
 
 (defmethod parse-git-object ((obj (eql :tag)) data hash &key start size)
+  "Parses the git object of type TAG"
   (let* ((parsed-data (parse-text-git-data data start size))
          (self (make-instance 'tag :hash hash :comment (cdr parsed-data))))
     (dolist (line (car parsed-data))
@@ -260,6 +271,7 @@ nothing found"
           (+ 21 separator))))
 
 (defmethod parse-git-object ((obj (eql :tree)) data hash &key start size)
+    "Parses the git object of type TREE"
   ;; format:
   ;; [mode] [file/folder name]\0[SHA-1 of referencing blob or tree]
   ;; mode is a string, file/folder name is a string,

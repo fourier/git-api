@@ -247,7 +247,6 @@ will take the variable *try-use-temporary-output-buffer* into consideration"
   "Uncompress the file with git object - blob, commit etc.
 Will try to uncompress used C zlib if available, if not fallback
 to the CL zlib"
-  (todo "return (values type content) to avoid double parsing")
   ;; try to guess which version to use
   (if git-api.zlib.cffi:*zlib-loaded*
       ;; first try CFFI version as the fastest
