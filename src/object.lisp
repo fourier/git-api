@@ -142,20 +142,19 @@
   (let* ((data
           (git-api.zlib.wrapper:uncompress-git-file filename))
          (content-start (position 0 data))
-         (header 
-          (babel:octets-to-string data :start 0 :end content-start
-                                  :encoding :utf-8))
-         (header-split (split-sequence:split-sequence #\Space header))
+         (size-start (position 32 data))
+         (type (babel:octets-to-string data :start 0 :end size-start :encoding :utf-8))
+         (len (babel:octets-to-string data :start (1+ size-start) :end content-start :encoding :utf-8))
          ;; guess the hash. hash is the last 41 (40 hash + 1 directory separator)
          ;; characters of the filename, if the filename is in git repository
          ;; and not renamed git object
          (name (if (pathnamep filename) (namestring filename) filename))
          (hash-filename (subseq name (- (length name) 41))))
-    (parse-git-object (intern (string-upcase (car header-split)) "KEYWORD")
+    (parse-git-object (intern (string-upcase type) "KEYWORD")
                       data
                       (remove #\/ hash-filename) ;; remove dir separator
                       :start (1+ content-start)
-                      :size (parse-integer (cadr header-split)))))
+                      :size (parse-integer len))))
 
 (defgeneric parse-git-object (type data hash &key start size))
 
