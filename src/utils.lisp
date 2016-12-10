@@ -180,7 +180,7 @@ NOTE: OFFSET is ignored for streams"
   ;;(declare (:explain :variables :calls))
   (declare (optimize (speed 3) (safety 0) (debug 0)))
   (declare (type fixnum offset))
-  (declare (type (array (unsigned-byte 8)) array))
+  (declare (type (simple-array (unsigned-byte 8)) array))
   (let ((hex (make-array 40 :element-type 'character :adjustable nil))) 
     (dotimes (x 20)
       (declare (type fixnum x))
@@ -217,6 +217,7 @@ to the byte array.
 If RESULT array is given - write to this array"
   (declare (optimize (speed 3) (safety 0)))
   ;;(declare (:explain :variables :calls))
+  (declare (type (or null (simple-array (unsigned-byte 8))) result))
   (unless result
     (setf result (make-array 20 :element-type '(unsigned-byte 8) :adjustable nil)))
   (macrolet ((hex-to-number (hex)

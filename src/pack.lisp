@@ -268,18 +268,18 @@ the value is a instance of PACK-ENTRY structure."
 size(including header).
 INDEX is a sorted list of pairs (sha1 . offset)"
   ;;(declare (optimize (speed 3) (safety 0) (debug 0)))
-  (declare (type integer offset compressed-size i file-length))
+  (declare (type integer file-length))
   ;; fill the table.
   (loop with table = (make-hash-table :test #'equalp :size (length index))
         and file-length = (- file-length 20)
         and number-of-entries = (length index)
-        for i from 0 below number-of-entries
-        for offset = (car (aref index i))
+        for i fixnum from 0 below number-of-entries
+        for offset fixnum = (car (aref index i))
         ;; calculate the compressed size (size in pack file).
         ;; This size includes the header size as well
         ;; The size is the  difference between data offset of the current
         ;; and next entry...
-        for compressed-size =
+        for compressed-size fixnum =
         (- (if (< i (1- number-of-entries))
                (car (aref index (1+ i)))
                ;; or end of file(without SHA-1 trailer of 20 bytes)
@@ -343,7 +343,6 @@ Remove msb -> 108, shift << 4 = 1728.
 Third byte, no msb -> 3, shift 11 (4 + 7) = 6144
 And finally the length is 6144 + 1733 = 7833"
   (declare (optimize (speed 3) (safety 0) (debug 0)))
-  (declare (type fixnum head shift type len))
   (let* ((base-hash (make-array +sha1-size+
                                 :element-type '(unsigned-byte 8)
                                 :fill-pointer 0 :adjustable nil))
@@ -353,6 +352,7 @@ And finally the length is 6144 + 1733 = 7833"
          ;; type is encoded first (after MSB)
          (type (ash (logand head 112) (- shift)))
          (len (logand 15 head)))
+    (declare (type fixnum head shift type len))
     ;; calculate variable-length integer (uncompressed size)
     (loop while (>= head 128)
           do
@@ -385,7 +385,7 @@ offset encoding:
 	  for n >= 2 adding 2^7 + 2^14 + ... + 2^(7*(n-1))
 	  to the result.
 -----------------------"
-  (declare (optimize (float 0)))
+  #+lispworks (declare (optimize (float 0)))
   ;; read the first byte
   (let* ((head (read-byte stream))
          (value (logand 127 head)))
@@ -403,7 +403,7 @@ to specify size of delta.
 
 Details: this size is encoded in
 little-endian format, therefore the most significant byte comes last"
-  (declare (optimize (float 0)))
+  #+lispworks (declare (optimize (float 0)))
   ;; read the first byte
   (let* ((head (read-byte stream))
          ;; first value is this byte without MSB
@@ -468,6 +468,7 @@ what is the hash code of the parent delta object"
                ;; sorted by offset. It is needed to determine the
                ;; end of the compressed entry in the pack file
                (index (make-array size :adjustable nil :element-type '(cons ))))
+          (declare (type fixnum size objects-pos pos))          
           (declare (ignore pos))
           ;; now move to the position where the objects started
           ;; we will read them one by one to fill the index table
@@ -488,7 +489,7 @@ what is the hash code of the parent delta object"
                       (gethash offset offsets-table) hash))
           ;; finally return the offsets-table and sorted array of conses (offset . hash)
           (values offsets-table
-                  (sort index (lambda (x y) (declare (integer x y)) (< x y)) :key (lambda (x) (the integer (car x))))))))))
+                  (sort index (lambda (x y) (declare (fixnum x y)) (< x y)) :key (lambda (x) (the integer (car x))))))))))
 
           
 (defun read-fanout-table (stream)

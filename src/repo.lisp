@@ -186,10 +186,10 @@ in .git/objects are containing objects (not a packfiles or info)")
         head-contents
         ;; otherwise search if this file exists
         (let* ((head-ref (cadr (split-sequence:split-sequence #\space head-contents))))
-          (get-hash-by-ref self head-ref)))))
+          (rev-parse self head-ref)))))
 
 
-(defmethod get-hash-by-ref ((self git-repo) ref)
+(defmethod rev-parse ((self git-repo) ref)
   "Returns the hash string by given ref string.
 Examples of ref strings:
 ref/heads/master
@@ -201,7 +201,12 @@ refs/tags/v1.0"
           (read-one-line ref-file)
           ;; otherwise find in packed refs
           (gethash ref packed-refs)))))
-    
+
+
+(defmethod symbolic-ref ((self git-repo) ref)
+  "Returns the "
+  ;; http://stackoverflow.com/questions/5772192/how-can-i-reconcile-detached-head-with-master-origin
+  )
 
 (defmethod get-head-commit ((self git-repo))
   (get-commit self (get-head-hash self)))
