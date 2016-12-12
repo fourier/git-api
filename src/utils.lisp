@@ -11,6 +11,7 @@
    read-header
    sha1-to-hex
    sha1-hex-to-array
+   sha1-string-p
    make-array-view))
 
 (in-package #:git-api.utils)
@@ -20,6 +21,7 @@
 ;;----------------------------------------------------------------------------
 (defparameter *zero-ascii-begin* (char-code #\0))
 (defparameter *char-ascii-begin* (char-code #\a))
+(defparameter +sha1-string-regex+ (ppcre:create-scanner "^[a-f0-9]{40}$"))
 (declaim (type fixnum *zero-ascii-begin* *char-ascii-begin*))
 
 
@@ -244,3 +246,6 @@ If RESULT array is given - write to this array"
               :element-type (array-element-type vector)))
 
 
+(defun sha1-string-p (string)
+  (when (ppcre:scan +sha1-string-regex+ string)
+    t))

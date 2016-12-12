@@ -192,7 +192,9 @@ in .git/objects are containing objects (not a packfiles or info)")
 (defmethod rev-parse ((self git-repo) ref)
   "Returns the hash string by given ref string.
 Examples of ref strings:
-ref/heads/master
+@
+HEAD
+refs/heads/master
 refs/tags/v1.0"
   (with-slots (packed-refs) self
     (let ((ref-file (repo-path self ref)))
