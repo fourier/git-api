@@ -196,14 +196,25 @@ Examples of ref strings:
 HEAD
 refs/heads/master
 refs/tags/v1.0"
-  (with-slots (packed-refs) self
-    (let ((ref-file (repo-path self ref)))
-      ;; check if the ref is a normal file
-      (if (fad:file-exists-p ref-file)
-          (read-one-line ref-file)
-          ;; otherwise find in packed refs
-          (gethash ref packed-refs)))))
-
+  (flet ((ref-or-sha1 (str)
+           (if (not (starts-with-subseq "ref: " str))
+               str
+               (second (split-sequence:split-sequence #\space str)))))
+  (cond ((sha1-string-p ref) ref)
+        ((or (string= ref "HEAD")
+             (string= ref "@"))
+         (let ((ref-file (repo-path self "HEAD")))
+           (when (fad:file-exists-p ref-file)
+             (rev-parse self (ref-or-sha1 (read-one-line ref-file))))))
+        (t 
+         (with-slots (packed-refs) self
+           (let ((ref-file (repo-path self ref)))
+             ;; check if the ref is a normal file
+             (if (fad:file-exists-p ref-file)
+                 (rev-parse self (ref-or-sha1 (read-one-line ref-file)))
+                 ;; otherwise find in packed refs
+                 (gethash ref packed-refs))))))))
+  
 
 (defmethod symbolic-ref ((self git-repo) ref)
   "Returns the "
