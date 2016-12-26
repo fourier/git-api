@@ -14,6 +14,7 @@
    get-commit-tree
    get-object-by-hash
    get-head-hash
+   rev-parse
    get-commit-parents
    get-commit
    ))
@@ -179,14 +180,7 @@ in .git/objects are containing objects (not a packfiles or info)")
 
 
 (defmethod get-head-hash ((self git-repo))
-  (let* ((head-file (repo-path self "HEAD"))
-         (head-contents (read-one-line head-file)))
-    ;; check if the HEAD points to the detached commit
-    (if (not (starts-with-subseq "ref: " head-contents))
-        head-contents
-        ;; otherwise search if this file exists
-        (let* ((head-ref (cadr (split-sequence:split-sequence #\space head-contents))))
-          (rev-parse self head-ref)))))
+  (rev-parse self "HEAD"))
 
 
 (defmethod rev-parse ((self git-repo) ref)
@@ -215,11 +209,6 @@ refs/tags/v1.0"
                  ;; otherwise find in packed refs
                  (gethash ref packed-refs))))))))
   
-
-(defmethod symbolic-ref ((self git-repo) ref)
-  "Returns the "
-  ;; http://stackoverflow.com/questions/5772192/how-can-i-reconcile-detached-head-with-master-origin
-  )
 
 (defmethod get-head-commit ((self git-repo))
   (get-commit self (get-head-hash self)))
