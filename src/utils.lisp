@@ -58,7 +58,13 @@ In the last example imports all the exported symbols from the package given."
 (defmacro read-one-line (filename)
   "Read exactly one first line from the file"
   (let ((stream-var (gensym)))
-    `(with-open-file (,stream-var ,filename :direction :input)
+    `(with-open-file (,stream-var ,filename :direction :input
+                                  :external-format
+                                  #+(and :ccl :windows)
+                                  (ccl::make-external-format :line-termination :CRLF)
+                                  #-(and :ccl :windows)
+                                  :default
+                                  )
        (read-line ,stream-var))))
 
 

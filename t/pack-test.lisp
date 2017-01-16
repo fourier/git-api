@@ -53,7 +53,12 @@
       pack-open-stream
       pack-close-stream
       create-indexes-from-pack-file)
-      
+
+
+(defparameter +max-offset-bits+
+  (min (integer-length most-negative-fixnum) 32)
+  "Maximum size of bits allowed to hold offset")
+
 
 (defparameter +network-vli-tests+
   '((240 128 112) 
@@ -282,29 +287,35 @@ command in the t/data/example-repo/objects/pack directory")
           :test #'equalp))))
 
 
+
 (defun create-small-random-offsets (size)
   (make-array size :initial-contents
-              (loop for i from 0 below size collect (random (ash 2 30)))))
+              (loop for i from 0 below size collect (random (ash 2 +max-offset-bits+)))))
 
 (defun create-big-random-offsets (size)
   (make-array size :initial-contents  
               (loop for i from 0 below size collect (random (ash 2 63)))))
 
+
 (subtest "Testing read-offsets"
   ;; read-offsets
-  (let* ((size-smalls 2)
+  (let* ((size-smalls 20)
          (size-bigs 1)
          (table-small (create-small-random-offsets size-smalls))
          (table-big (create-big-random-offsets size-bigs)))
     (declare (ignore table-big))
-    ;; encode smalls into the stream
-    (let ((table 
-           (flexi-streams:with-output-to-sequence (stream)
-             (loop for x across table-small do (write-ub32/be x stream)))))
-      (flexi-streams:with-input-from-sequence (stream table)
-        (is (read-offsets stream size-smalls) table-small
-            "check simple table with values < 2^31"
-            :test #'equalp)))
+    (flet ((test-small-table (small-table description)
+             ;; encode smalls into the stream
+             (let ((table 
+                    (flexi-streams:with-output-to-sequence (stream)
+                      (loop for x across small-table do (write-ub32/be x stream)))))
+               (flexi-streams:with-input-from-sequence (stream table)
+                 (is (read-offsets stream (length small-table)) small-table
+                     description
+
+                     :test #'equalp)))))
+      (test-small-table #(30434114 865000178) "check simple table with selected values < 2^31")
+      (test-small-table table-small "check simple table with random values < 2^31"))
     ;; test of small offsets + big offsets
 ;;    (let ((order (random-shuffle (iota (+ size-smalls size-bigs)))
     (skip 1 "TODO: reimplement large offsets handling and enable this test")
@@ -505,11 +516,19 @@ command in the t/data/example-repo/objects/pack directory")
         "Test of pack-get-object-by-hash for delta object")))
   
 
+(defun read-string (filename)
+  (alexandria:read-file-into-string filename
+                                    :external-format
+                                    #+(and :ccl :windows)
+                                    (ccl::make-external-format :line-termination :CRLF)
+                                    #-(and :ccl :windows)
+                                    :default))
+
 (subtest "Test of the parse-pack-file and creation of instances of pack-file object"
   (let ((blob-obj
-         (read-file-into-string (testfile "example-repo-extracted/dee95d63ff98bc1b1ef6e26ae7d83eb40d653d3e.contents")))
+         (read-string (testfile "example-repo-extracted/dee95d63ff98bc1b1ef6e26ae7d83eb40d653d3e.contents")))
         (delta-obj
-         (read-file-into-string (testfile "example-repo-extracted/9eeff76aaa278e9253b0106dfab6b8ab2619d695.contents")))
+         (read-string (testfile "example-repo-extracted/9eeff76aaa278e9253b0106dfab6b8ab2619d695.contents")))
         (pack
          (parse-pack-file
           (namestring (testfile "example-repo/objects/pack/pack-559f5160ab63a074f365f538d209164b5d8a715a.pack")))))
