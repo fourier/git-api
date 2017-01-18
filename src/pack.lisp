@@ -528,23 +528,19 @@ SIZE is the size of offsets table."
   ;;     objects toward the front, so most object references should
   ;;     not need to refer to this table.'
   (let* ((offsets (make-array size :element-type 'fixnum :adjustable nil))
-         (big-offsets nil)
-         (bytes-size (* size 4))
-         (table (make-array bytes-size :element-type '(unsigned-byte 8)  :adjustable nil)))
-    ;; we will read all the table into bytes array
-    (read-sequence table stream)
-    (loop for i fixnum from 0 below bytes-size by 4 do
+         (big-offsets nil))
+    (loop for i fixnum from 0 below size
+          for value of-type integer = (read-ub32/be stream)
           ;; processing separately depending if the MSB is set on the first
           ;; byte of encoded length
-          (if (>= (the fixnum (aref table i)) 128)
-              ;; large files: if set we clear the msb 
-              (progn
-                (setf (aref table i) (logand 127 (aref table i)))
-                ;; and push to the list of "big offsets" as a pair:
-                ;; index in original table and index in big offsets table
-                (push (cons (ash i -2) (ub32ref/be table i)) big-offsets))
-              ;; otherwise just NTOHL the value into the offsets array
-              (setf (aref offsets (ash i -2)) (ub32ref/be table i))))
+          if (>= value (ash 1 31))
+          ;; large files: if set we clear the msb
+          ;; and push to the list of "big offsets" as a pair:
+          ;; index in original table and index in big offsets table
+          do (push (cons i (logand value (1- (ash 1 31)))) big-offsets)
+          else 
+          ;; otherwise just NTOHL the value into the offsets array
+          do (setf (aref offsets i) value))
     ;; WARNING!
     ;; the code below for large (> 2gb) files in pack files
     ;; does not work since the size of big files couldn't fit into

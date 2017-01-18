@@ -8,7 +8,6 @@ env:
     - LISP=ccl32
 
 os:
-  - osx
   - linux  
 
 install:
