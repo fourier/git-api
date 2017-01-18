@@ -283,8 +283,10 @@ command in the t/data/example-repo/objects/pack directory")
 
 
 (defun create-small-random-offsets (size)
+  (let ((offset
+         (min 31 (integer-length most-positive-fixnum))))
   (make-array size :initial-contents
-              (loop for i from 0 below size collect (random most-positive-fixnum))))
+              (loop for i from 0 below size collect (random (ash 1 offset))))))
 
 (defun create-big-random-offsets (size)
   (make-array size :initial-contents  
