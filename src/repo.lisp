@@ -98,6 +98,9 @@ in .git/objects are containing objects (not a packfiles or info)")
     (let ((packed-refs-filename (repo-path self "packed-refs")))
       (when (fad:file-exists-p packed-refs-filename)
         (with-open-file (stream packed-refs-filename
+                                  :external-format
+                                  #+(and :ccl :windows) (ccl::make-external-format :line-termination :CRLF)
+                                  #-(and :ccl :windows) :default
                                 :direction :input)
           (let (prev-ref) ; previous ref
             (loop for line = (read-line stream nil)

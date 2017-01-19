@@ -157,8 +157,7 @@
         "Test for commit tree object")
     (is (commit-parents commit) nil :test #'equalp
         "Test for commit with no parents")
-    (is (commit-comment commit) "Initial import
-" :test #'string=
+    (is (commit-comment commit) (format nil "Initial import~%") :test #'string=
         "Test for commit comment")))
 
 (subtest "Test parsing of commit with empty comment"
@@ -181,13 +180,17 @@
     (is (commit-comment commit) "" :test #'string=
         "Test for commit comment")
     ;; test print
-    (is-print (format t "~a" commit) "commit: 26aa178ffc4a43d61373f968a7f36dd642e1724f
-tree 734edd9fe815f08b525f2342a50ba39da5a9d3ad
-author Alexey Veretennikov <alexey.veretennikov@gmail.com> 1479758629 +0100
-committer Alexey Veretennikov <alexey.veretennikov@gmail.com> 1479758629 +0100
-parents 84c5c1f741ed4e72ffe7f6152111fc4288a632cb
-comment
-" "Test of print function of the commit object")))
+    (let* ((lines
+           '("commit: 26aa178ffc4a43d61373f968a7f36dd642e1724f"
+             "tree 734edd9fe815f08b525f2342a50ba39da5a9d3ad"
+             "author Alexey Veretennikov <alexey.veretennikov@gmail.com> 1479758629 +0100"
+             "committer Alexey Veretennikov <alexey.veretennikov@gmail.com> 1479758629 +0100"
+             "parents 84c5c1f741ed4e72ffe7f6152111fc4288a632cb"
+             "comment"))
+           (expected (with-output-to-string (s)
+                       (dolist (line lines) (write-line line s)))))
+    (is-print (format t "~a" commit) expected
+                 "Test of print function of the commit object"))))
 
 
 (subtest "Testing of the parsing of tree objects"

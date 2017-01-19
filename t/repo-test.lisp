@@ -33,5 +33,4 @@
       (is-type (gethash "0ec3337eede3a64aaed50f737adf163e9f8d92dc" commits-tree) 'git-api.object:commit
                "Check commit 3"))))
 
-
 (finalize)

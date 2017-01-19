@@ -35,10 +35,6 @@
   (use-foreign-library zlib)
   (setf *zlib-loaded* t))
 
-(defparameter +z-stream-size+
-  (if *zlib-loaded* (cffi:foreign-type-size '(:struct z-stream)) 0)
-  "The size of z-stream structure. If zlib is not available then 0")
-
 ;;----------------------------------------------------------------------------
 ;; Constants 
 ;;----------------------------------------------------------------------------
@@ -117,6 +113,11 @@
   (adler :unsigned-long)
   ;;    uLong   reserved;   /* reserved for future use */
   (reserved :unsigned-long))
+
+;; we can only declare this parameter _after_ declaring the struct
+(defparameter +z-stream-size+
+  (if *zlib-loaded* (cffi:foreign-type-size '(:struct z-stream)) 0)
+  "The size of z-stream structure. If zlib is not available then 0")
 
 
 (defcfun ("compress" compress) :int
