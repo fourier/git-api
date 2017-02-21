@@ -116,7 +116,7 @@
 ;;----------------------------------------------------------------------------
 ;; Git Tag class
 ;;----------------------------------------------------------------------------
-;; TODO: review and comment it
+(todo "review class `tag' and comment it")
 (defclass tag (git-object)
   ((object :initarg :tree :reader tag-object :initform "")
    (type :initarg :author :reader tag-type :initform "")

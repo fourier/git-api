@@ -182,6 +182,14 @@ in .git/objects are containing objects (not a packfiles or info)")
           (parse-git-file (gethash hash object-files))))))
 
 
+(defmethod cat-file ((self git-repo) hash &optional (stream *standard-output*))
+  "Pretty-prints the contents of a object pointed by hash to the stream.
+If stream is not provided, using the *standard-output*.
+It is a wrapper around get-object-by-hash"
+  (when-let ((contents (get-object-by-hash self hash)))
+    (print-object contents stream)))
+    
+
 (defmethod get-head-hash ((self git-repo))
   (rev-parse self "HEAD"))
 
