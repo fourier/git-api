@@ -40,7 +40,15 @@
                            (:file "wrapper")))
                  (:file "pack" :depends-on ("utils" "zlib"))
                  (:file "object" :depends-on ("utils" "zlib"))
-                 (:file "repo" :depends-on ("utils" "pack" "object")))))
+                 (:file "repo" :depends-on ("utils" "pack" "object"))
+                 (:module "plumbing"
+                  :depends-on ("repo")
+                  :serial t
+                  :components
+                  ((:file "helpers")
+                   (:file "info")
+                   (:file "manip")
+                   (:file "sync"))))))
   :description "Library for accessing git repository"
   :long-description
   #.(with-open-file (stream (merge-pathnames
