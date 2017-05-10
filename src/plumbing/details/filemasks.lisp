@@ -9,8 +9,7 @@
 
 ;; NOTE:wildcard to regexp functionality taken from my project
 ;; mediaimport. Probably move it to separate utility library?
-
-(defconstant +regex-escape-chars+
+(define-constant +regex-escape-chars+
   '(#\\
     #\*
     #\+
@@ -27,7 +26,8 @@
     #\.
     #\#
     #\Space)
-"List of special characters to be escaped in file mask")
+  :test #'equalp
+  :documentation "List of special characters to be escaped in file mask")
 
 
 (defun wildcard-to-regex (wildcard &key (case-sensitive-p t))
