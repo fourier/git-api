@@ -44,7 +44,9 @@
                  (:test-file "pack-test")
                  (:test-file "wrapper-test")
                  (:test-file "object-test")
-                 (:test-file "repo-test"))))
+                 (:test-file "repo-test")
+				 (:test-file "filemasks-test")
+				 (:test-file "attributes-test"))))
   :description "Test system for git-api"
 
   :defsystem-depends-on (:prove-asdf)

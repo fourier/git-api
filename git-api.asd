@@ -45,7 +45,12 @@
                   :depends-on ("repo")
                   :serial t
                   :components
-                  ((:file "helpers")
+				  ((:module "details"
+							:serial t
+							:components
+							((:file "filemasks")
+							 (:file "attributes")))
+				   (:file "helpers")
                    (:file "info")
                    (:file "manip")
                    (:file "sync"))))))
