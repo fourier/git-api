@@ -19,6 +19,21 @@
       "Testing input: Photo*.jpg")
   (is (wildcard-to-regex "Photo*.jpg" :case-sensitive-p nil) 
       "(?i)^Photo.*\\.jpg$"
-      "Testing input: Photo*.jpg case-insensitive"))
+      "Testing input: Photo*.jpg case-insensitive")
+  (is (wildcard-to-regex "Photo[.jpg" :case-sensitive-p nil)
+      "(?i)^Photo\\[\\.jpg$"
+      "Testing input: Photo[*.jpg case-insensitive")
+  (is (wildcard-to-regex "Photo[ab].jpg" :case-sensitive-p nil)
+      "(?i)^Photo[ab]\\.jpg$"
+      "Testing input: Photo[ab].jpg")
+  (is (wildcard-to-regex "Photo[!ab].jpg" :case-sensitive-p nil)
+      "(?i)^Photo[^ab]\\.jpg$"
+      "Testing input: Photo[!ab].jpg")
+  (is (wildcard-to-regex "Photo[^ab].jpg" :case-sensitive-p nil)
+      "(?i)^Photo[\\^ab]\\.jpg$"
+      "Testing input: Photo[^ab].jpg"))
+
+
+
 
 (finalize)
