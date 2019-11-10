@@ -53,7 +53,8 @@
 				   (:file "helpers")
                    (:file "info")
                    (:file "manip")
-                   (:file "sync"))))))
+           (:file "sync")))
+                 (:file "package"))))
   :description "Library for accessing git repository"
   :long-description
   #.(with-open-file (stream (merge-pathnames

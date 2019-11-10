@@ -17,7 +17,7 @@
    rev-parse
    get-commit-parents
    get-commit
-   ))
+   cat-file))
 
 (in-package #:git-api.repo)
 
