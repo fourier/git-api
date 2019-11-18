@@ -39,4 +39,13 @@
         +big-data-uncompressed+ "Test uncompress-git-file with cffi-zlib on big file" :test #'equalp)))
 
 
+(subtest "Test of the example git commit"
+  (let* ((input-file (testfile "git-commit.compressed"))
+         (uncompressed-file (testfile "git-commit.uncompressed"))
+         (expected (read-binary-file uncompressed-file)))
+    (let ((git-api.zlib.cffi:*zlib-loaded* nil))
+      (is (uncompress-git-file input-file) expected "Testing of uncompress-git-file without zlib loaded" :test #'equalp))
+    (let ((git-api.zlib.cffi:*zlib-loaded* t))
+      (is (uncompress-git-file input-file) expected "Testing of uncompress-git-file with zlib loaded" :test #'equalp))))
+
 (finalize)
