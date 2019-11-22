@@ -100,7 +100,7 @@ if the size < +buffer-size+"
 
 (defun raise (error-text &rest args)
   "Raises the zlib-error condition with the format text ERROR-TEXT and format ARGS"
-  (error 'zlib-error :text (apply #'format error-text args)))
+  (error 'zlib-error :text (apply #'format nil error-text args)))
 
 
 (declaim (inline copy-static-vector))
@@ -108,9 +108,10 @@ if the size < +buffer-size+"
   "Copy the SIZE bytes from static vector STATIC-VECTOR to the lisp vector of type (unsigned-byte 8)
 NORMAL-VECTOR starting in source vector from INPUT-OFFSET and into the OUTPUT-OFFSET of the
 destination vector"
-  (declare (optimize (speed 3) (safety 0) (debug 0) (float 0)))
-  (loop for i from input-offset below (+ size input-offset)
-        for offset = (+ i output-offset)
+  (declare (optimize (speed 3) (safety 0) (debug 0) #+lispworks (float 0)))
+  (declare (type fixnum input-offset size output-offset))
+  (loop for i fixnum from input-offset below (+ size input-offset)
+        for offset fixnum = (+ i output-offset)
         for val = (the (unsigned-byte 8)
                        (cffi:mem-aref (static-vector-pointer static-vector) :unsigned-char i))
         do (setf (aref normal-vector offset) val))
@@ -290,58 +291,154 @@ to the CL zlib"
           (cffi:with-foreign-slots ((next-in avail-in next-out avail-out total-out)
                                     strm (:struct z-stream))
             (setf next-in (static-vector-pointer input)
-                  avail-in (min 64 size) ; read no more than 64 bytes - it is enough to read a header
+                  avail-in (min +buffer-size+ size) ; read no more than +buffer-size+ bytes - it is enough to read a header
                   next-out (static-vector-pointer *git-object-header-static-buffer*)
                   ;; header assumed to be is no more than 32 bytes,
                   ;; at least in Git implementation itself it is the assumption
                   avail-out +git-object-header-size+)
+            (format t "avail-in ~a avail-out ~a total-out ~a~%"
+                    avail-in avail-out total-out)
             ;; initialize the stream
             (unless-result-is (+z-ok+ (inflate-init_ strm (zlib-version) +z-stream-size+))
               (raise "zlib inflate-init returned ~d on a file ~a" result filename))
             (unwind-protect
-                (let ((result (inflate strm +z-finish+)))
-                  (unless (or (= result +z-stream-end+)
-                              (= result +z-buf-error+)
-                              (= result +z-ok+))
-                    (raise "zlib inflate returned ~d while unpacking header on a file ~a" result filename))
-                  ;; when we have uncompressed everything, meaning
-                  ;; header + size <= 32 bytes,
-                  ;; just return result as a copy of static buffer
-                  (if (= result +z-stream-end+)
-                      (copy-static-vector *git-object-header-static-buffer*
-                                          (make-array total-out :element-type '(unsigned-byte 8))
-                                          total-out)
-                      ;; otherwise find the end of the header with type and size
-                      (let* ((header-size (position 0 *git-object-header-static-buffer*))
-                             (content-size (parse-integer
-                                            (babel:octets-to-string *git-object-header-static-buffer*
-                                                                    :start (1+ (position 32 *git-object-header-static-buffer*))
-                                                                    :end header-size)))
-                             (uncompressed-size (+ 1 header-size content-size)))
-                        ;; finally allocate static vector to uncompress the rest of the data
-                        ;; the static vector size is at maximum content-size,
-                        ;; but could be (typically) less since parts of content was already
-                        ;; uncompressed to the *git-object-header-static-buffer*
-                        (with-temp-static-array (static-content content-size *temporary-static-output-buffer*)
-                          ;; update stream with the rest of the data
-                          (setf avail-in (- size avail-in)
-                                avail-out content-size
-                                next-out (static-vector-pointer static-content))
-                          ;; and finally uncompress the rest
-                          (unless-result-is ((+z-ok+ +z-stream-end+) (inflate strm +z-finish+))
-                            (raise "zlib inflate returned ~d on a file ~a" result filename))
-                          ;; create the output vector
-                          (let ((content (make-array uncompressed-size
-                                                     :element-type '(unsigned-byte 8))))
-                            ;; first take the first 32 uncompressed bytes of header + parts of content...
-                            (copy-static-vector *git-object-header-static-buffer*
-                                                content
-                                                +git-object-header-size+)
-                            ;; ... and then take the remaining uncompressed content
-                            (copy-static-vector static-content
-                                                content
-                                                (- uncompressed-size +git-object-header-size+)
-                                                :output-offset +git-object-header-size+))))))
-              (inflate-end strm))))))))
+                 (let ((result (inflate strm +z-finish+)))
+                   (unless (or (= result +z-stream-end+)
+                               (= result +z-buf-error+)
+                               (= result +z-ok+))
+                     (raise "zlib inflate returned ~d while unpacking header on a file ~a" result filename))
+                   (format t "avail-in ~a avail-out ~a total-out ~a result ~a~%"
+                           avail-in avail-out total-out result)
+                   ;; when we have uncompressed everything, meaning
+                   ;; header + size <= 32 bytes,
+                   ;; just return result as a copy of static buffer
+                   (if (= result +z-stream-end+)
+                       (copy-static-vector *git-object-header-static-buffer*
+                                           (make-array total-out :element-type '(unsigned-byte 8))
+                                           total-out)
+                       ;; otherwise find the end of the header with type and size
+                       (let* ((header-size (position 0 *git-object-header-static-buffer*))
+                              (content-size (parse-integer
+                                             (babel:octets-to-string *git-object-header-static-buffer*
+                                                                     :start (1+ (position 32 *git-object-header-static-buffer*))
+                                                                     :end header-size)))
+                              (uncompressed-size (+ 1 header-size content-size))
+                              ;; create the output vector
+                              (content (make-array uncompressed-size
+                                                   :element-type '(unsigned-byte 8))))
+                         (format t "header-size ~a content-size ~a uncompressed-size ~a~%"
+                                 header-size content-size uncompressed-size)
+                         ;; first take the first 32 uncompressed bytes of header + parts of content...
+                         (copy-static-vector *git-object-header-static-buffer*
+                                             content
+                                             +git-object-header-size+)
+                         ;; finally allocate static vector to uncompress the rest of the data
+                         ;; the static vector size is at maximum content-size,
+                         ;; but could be (typically) less since parts of content was already
+                         ;; uncompressed to the *git-object-header-static-buffer*
+                         (with-temp-static-array (static-content content-size *temporary-static-output-buffer*)
+                           ;; update stream with the rest of the data
+                           (setf avail-in (- size avail-in)
+                                 avail-out content-size
+                                 next-out (static-vector-pointer static-content))
+                           ;; and finally uncompress the rest
+                           (unless-result-is ((+z-ok+ +z-stream-end+) (inflate strm +z-finish+))
+                             (raise "zlib inflate returned ~d on a file ~a" result filename))
+                           ;; ... and then take the remaining uncompressed content
+                           (copy-static-vector static-content
+                                               content
+                                               (- uncompressed-size +git-object-header-size+)
+                                               :output-offset +git-object-header-size+))))))
+            (inflate-end strm)))))))
+
+
+
+(defun uncompress-git-file-cffi1 (filename)
+  "Uncompress the git object file using C-version of ZLIB"
+  ;; Git object format:
+  ;; header\0(content)
+  ;; where the header is: {type string}#\Space{content size string}
+  ;; From this the uncompressed size is (header size) + 1 + (content size)
+  ;; Algorithm:
+  ;; 1. Read up to 32 (+git-object-header-size+) bytes of output buffer
+  ;; 2. Parse the input
+  ;; 3. If content size <= 32 - (header size + 1)
+  ;;    meaning it fit completely into the 32 bytes, just return the result
+  ;; 4. Otherwise if content size < 8192 - (header size + 1)
+  ;;    meaning we can use pre-allocated buffer - use it
+  ;; 5. Otherwise allocate the buffer of the size (header size + 1 + content size) and use it
+  ;; open the stream and read the file contents into the static vector
+  (with-open-file (stream filename :direction :input :element-type '(unsigned-byte 8))
+    (let ((size (file-length stream))
+          (content (make-array +buffer-size+ :element-type '(unsigned-byte 8) :adjustable t))) 
+      (with-temp-static-array (input size *temporary-static-read-buffer*)
+        (read-sequence input stream)
+        ;; create a stream struct
+        (cffi:with-foreign-object (strm '(:struct z-stream))
+          ;; clear the stream struct
+          (memset strm 0 +z-stream-size+)
+          ;; initalize values in struct
+          (cffi:with-foreign-slots ((next-in avail-in next-out avail-out total-out)
+                                    strm (:struct z-stream))
+            (setf next-in (static-vector-pointer input)
+                  avail-in (min +buffer-size+ size) ; read no more than +buffer-size+ bytes - it is enough to read a header
+                  next-out (static-vector-pointer *git-object-header-static-buffer*)
+                  ;; header assumed to be is no more than 32 bytes,
+                  ;; at least in Git implementation itself it is the assumption
+                  avail-out +git-object-header-size+)
+            (format t "avail-in ~a avail-out ~a total-out ~a~%"
+                    avail-in avail-out total-out)
+            ;; initialize the stream
+            (unless-result-is (+z-ok+ (inflate-init_ strm (zlib-version) +z-stream-size+))
+              (raise "zlib inflate-init returned ~d on a file ~a" result filename))
+            (unwind-protect
+                 (let ((result (inflate strm +z-finish+)))
+                   (unless (or (= result +z-stream-end+)
+                               (= result +z-buf-error+)
+                               (= result +z-ok+))
+                     (raise "zlib inflate returned ~d while unpacking header on a file ~a" result filename))
+                   (format t "avail-in ~a avail-out ~a total-out ~a result ~a~%"
+                           avail-in avail-out total-out result)
+                   ;; when we have uncompressed everything, meaning
+                   ;; header + size <= 32 bytes,
+                   ;; just return result as a copy of static buffer
+                   (if (= result +z-stream-end+)
+                       (copy-static-vector *git-object-header-static-buffer*
+                                           (make-array total-out :element-type '(unsigned-byte 8))
+                                           total-out)
+                       ;; otherwise find the end of the header with type and size
+                       (let* ((header-size (position 0 *git-object-header-static-buffer*))
+                              (content-size (parse-integer
+                                             (babel:octets-to-string *git-object-header-static-buffer*
+                                                                     :start (1+ (position 32 *git-object-header-static-buffer*))
+                                                                     :end header-size)))
+                              (uncompressed-size (+ 1 header-size content-size))
+                              ;; create the output vector
+                              (content (make-array uncompressed-size
+                                                   :element-type '(unsigned-byte 8))))
+                         (format t "header-size ~a content-size ~a uncompressed-size ~a~%"
+                                 header-size content-size uncompressed-size)
+                         ;; first take the first 32 uncompressed bytes of header + parts of content...
+                         (copy-static-vector *git-object-header-static-buffer*
+                                             content
+                                             +git-object-header-size+)
+                         ;; finally allocate static vector to uncompress the rest of the data
+                         ;; the static vector size is at maximum content-size,
+                         ;; but could be (typically) less since parts of content was already
+                         ;; uncompressed to the *git-object-header-static-buffer*
+                         (with-temp-static-array (static-content content-size *temporary-static-output-buffer*)
+                           ;; update stream with the rest of the data
+                           (setf avail-in (- size avail-in)
+                                 avail-out content-size
+                                 next-out (static-vector-pointer static-content))
+                           ;; and finally uncompress the rest
+                           (unless-result-is ((+z-ok+ +z-stream-end+) (inflate strm +z-finish+))
+                             (raise "zlib inflate returned ~d on a file ~a" result filename))
+                           ;; ... and then take the remaining uncompressed content
+                           (copy-static-vector static-content
+                                               content
+                                               (- uncompressed-size +git-object-header-size+)
+                                               :output-offset +git-object-header-size+))))))
+            (inflate-end strm)))))))
 
 
